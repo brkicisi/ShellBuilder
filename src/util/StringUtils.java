@@ -1,5 +1,5 @@
 
-package main.java.pc2019;
+package util;
 
 import java.util.Comparator;
 

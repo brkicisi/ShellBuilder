@@ -1,7 +1,36 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <classpath>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
-	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="output" path="bin"/>
-	<classpathentry kind="src" path="RapidWright"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8" />
+	<classpathentry kind="src" path="src" />
+	<classpathentry kind="output" path="bin" />
+	<!--><classpathentry kind="src" path="RapidWright" /><!-->
+	<classpathentry kind="src" path="RapidWright" />
+	
+	<!--
+		I copied the following from RapidWright/.classpath (everything of type=lib)
+		but appended my RapidWright path (/thesis0/pc2019/Software/RapidWright/RapidWright/) before the jars folder
+		-->
+	
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/rapidwright-api-lib-2018.3.3.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/RapidWright/jars/rapidwright-api-lib-2018.3.3-javadoc.jar!/" />
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/reflectasm-1.10.1-shaded.jar" />
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/protobuf-java-3.0.2.jar" />
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/qtjambi-4.5.2_01.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/rapidSmith/jars/qtjambi-4.5.2_01-javadoc.jar!/" />
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/qtjambi-linux64-gcc-4.5.2_01.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:platform:/resource/rapidSmith/jars/qtjambi-4.5.2_01-javadoc.jar!/" />
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/objenesis-2.1.jar" />
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/jopt-simple-5.0.4.jar" />
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/kryo-4.0.0.jar" />
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/minlog-1.2.jar" />
+	<classpathentry kind="lib" path="/thesis0/pc2019/Software/RapidWright/RapidWright/jars/jython-standalone-2.7.0.jar" />
 </classpath>

@@ -3,4 +3,6 @@
 bin
 **/*.class
 .vscode
-
+RapidWright/bin/**
+RapidWright/data/**
+RapidWright/jars/**
