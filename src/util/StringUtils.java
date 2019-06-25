@@ -32,6 +32,9 @@ public class StringUtils {
 			}
 		};
     }
-    
+	
+	public static Comparator<String> getNaturalComparitor(){
+		return naturalComparator;
+	}
 
 }

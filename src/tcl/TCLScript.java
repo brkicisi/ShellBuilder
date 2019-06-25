@@ -23,10 +23,12 @@ public class TCLScript {
     public TCLScript(String input_dcp, String output_file, String tcl_script_name) {
         this(null, input_dcp, output_file, null, tcl_script_name);
     }
-    TCLScript(String input_dcp, String output_file, String options, String tcl_script_name) {
+
+    public TCLScript(String input_dcp, String output_file, String options, String tcl_script_name) {
         this(null, input_dcp, output_file, options, tcl_script_name);
     }
-    TCLScript(List<TCLEnum> cmds, String input_dcp, String output_file, String tcl_script_name) {
+
+    public TCLScript(List<TCLEnum> cmds, String input_dcp, String output_file, String tcl_script_name) {
         this(cmds, input_dcp, output_file, null, tcl_script_name);
     }
 
@@ -42,7 +44,7 @@ public class TCLScript {
      *                        only "f", "q", "v" and combinations are supported.
      * @param tcl_script_name File in which to save the script.
      */
-    TCLScript(List<TCLEnum> cmds, String input_dcp, String output_file, String options, String tcl_script_name) {
+    public TCLScript(List<TCLEnum> cmds, String input_dcp, String output_file, String options, String tcl_script_name) {
         this.tcl_script_name = (tcl_script_name == null) ? "default_output.tcl" : tcl_script_name;
         this.output_file = (output_file == null) ? "default_output.dcp" : output_file;
         this.options = (options == null) ? "" : options;
@@ -59,12 +61,36 @@ public class TCLScript {
                 tcl_script.add(new TCLCommand(te, options, output_file));
     }
 
+    /**
+     * Add a single command to the script using script's default options.
+     * 
+     * @param te Type of command to add.
+     */
     public void add(TCLEnum te) {
         tcl_script.add(new TCLCommand(te, options, output_file));
     }
 
-    void add(TCLEnum te, String opts) {
+    /**
+     * Add a single command to the script using given options.
+     * 
+     * @param te   Type of command to add.
+     * @param opts Options to use.
+     */
+    public void add(TCLEnum te, String opts) {
         tcl_script.add(new TCLCommand(te, opts, output_file));
+    }
+
+    /**
+     * Add a single tcl command to the script. The command is inserted as a single
+     * line exactly as given. This function does not change the commands Vivado
+     * understands, it simply allows the user to use commands. That I haven't
+     * explicitly provided support for in TCLEnum. No error check is done to ensure
+     * you have input a valid tcl command here.
+     * 
+     * @param custom_cmd Custom tcl command to insert.
+     */
+    public void addCustomCmd(String custom_cmd) {
+        tcl_script.add(new TCLCommand(custom_cmd));
     }
 
     /**
@@ -72,7 +98,7 @@ public class TCLScript {
      * 
      * @return Success.
      */
-    boolean write() {
+    public boolean write() {
         tcl_file = new File(tcl_script_name);
         List<String> tcl_strs = new ArrayList<>();
         for (TCLCommand cmd : tcl_script)

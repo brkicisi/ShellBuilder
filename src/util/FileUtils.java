@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.ArrayList;
 
 public class FileUtils {
-
     /**
      * Read a mapping file. Ignores blank lines and lines beginning with '#'. Strips
      * whitespace from read strings.
@@ -21,7 +20,7 @@ public class FileUtils {
      * @return The mappings read from the file.
      */
     public static Map<String, String> readMapFile(String filename, String separator, boolean warn) {
-        Map<String, String> m = new TreeMap<>();
+        Map<String, String> m = new TreeMap<>(StringUtils.naturalComparator);
         List<String> lines = FileTools.getLinesFromTextFile(filename);
         for (String line : lines) {
             if (line.trim().startsWith("#"))
@@ -53,6 +52,4 @@ public class FileUtils {
             lines.add(e.getKey() + sep + e.getValue());
         FileTools.writeLinesToTextFile(lines, filename);
     }
-
-
 }
