@@ -28,16 +28,15 @@ public class DesignUtils {
      * 
      * @param dcp_file Design checkpoint to write edif of.
      */
-    public static void generateEdif(String dcp_file, boolean verbose) {
-        // TODO get iii_dir everywhere (or at least to tcl)
+    public static void generateEdif(String dcp_file, boolean verbose, String dir) {
         TCLScript script = new TCLScript(dcp_file, dcp_file, (verbose ? "f" : "qf"),
-                "/nfs/ug/thesis/thesis0/pc2019/Igi/generate_edif.tcl");
+                dir + "/.generate_edif.tcl");
         script.add(TCLEnum.WRITE_EDIF);
         script.run();
     }
 
-    public static Design safeReadCheckpoint(File f_dcp, boolean verbose) {
-        return safeReadCheckpoint(f_dcp.getAbsolutePath(), verbose);
+    public static Design safeReadCheckpoint(File f_dcp, boolean verbose, String dir) {
+        return safeReadCheckpoint(f_dcp.getAbsolutePath(), verbose, dir);
     }
 
     /**
@@ -47,15 +46,19 @@ public class DesignUtils {
      * @param dcp_file Design checkpoint to open.
      * @return A Design object.
      */
-    public static Design safeReadCheckpoint(String dcp_file, boolean verbose) {
+    public static Design safeReadCheckpoint(String dcp_file, boolean verbose, String dir) {
         Design d = null;
         try {
             printIfVerbose(verbose, "\nLoading design from '" + dcp_file + "'.");
             d = Design.readCheckpoint(dcp_file);
         } catch (RuntimeException e) {
             printIfVerbose(verbose, "\nCouldn't open design at '" + dcp_file + "' due to encrypted edif.");
-            printIfVerbose(verbose, "Trying to generate unencrypted edif using vivado.\n");
-            generateEdif(dcp_file, verbose);
+			printIfVerbose(verbose, "Trying to generate unencrypted edif using vivado.\n");
+			if(dir == null){
+				int end = dcp_file.lastIndexOf("/");
+				dir = (end >= 0) ? "" : dcp_file.substring(0, end);
+			}
+            generateEdif(dcp_file, verbose, dir);
             printIfVerbose(verbose, "\nTrying to open design again.\n");
             d = Design.readCheckpoint(dcp_file);
         }

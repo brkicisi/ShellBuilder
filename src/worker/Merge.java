@@ -1,16 +1,13 @@
 package worker;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.*;
-import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.*;
-import com.xilinx.rapidwright.util.MessageGenerator;
 
 public class Merge {
     Design original = null;
@@ -20,8 +17,8 @@ public class Merge {
     public Merge() {
     }
 
-    public Merge(Design d, String clk_name, PBlock block) {
-        insertFirstDesign(d, clk_name, block);
+    public Merge(Design d) {
+        insertFirstDesign(d);
     }
 
     public Design getDesign() {
@@ -47,37 +44,24 @@ public class Merge {
         }
     }
 
-    private void insertFirstDesign(Design mergee, String mergee_clk_name, PBlock block) {
+    private void insertFirstDesign(Design mergee) {
+        // renames top cell inst so that they are not all named top
         mergee.getNetlist().getTopCellInst();
         mergee.getNetlist().renameNetlistAndTopCell(mergee.getName());
+        unconnected_ports = new ArrayList<>();
         this.original = mergee;
-        this.clk_name = mergee_clk_name;
-
-        // TODO may want this to be something other than a Collection.
-        // I think these top ports will all be unconnected if loading from ooc dcp
-        unconnected_ports = new ArrayList<>(original.getNetlist().getTopCell().getPorts());
-
-        // if this is not empty, there is something connected to the top level of the
-        // design
-        ArrayList<EDIFPortInst> connected_ports = new ArrayList<>(mergee.getNetlist().getTopCellInst().getPortInsts());
-
-        // TODO do something here
-        // place, connect, route, ...
-
     }
 
     /**
      * Merge another design with this design. Mostly copied from RapidWright class
      * ILAInserter:applyILAToDesign().
      * 
-     * Assumes clock net is already at top of hierchy if it exists.
-     * 
      * @param mergee          Design to merge with this.
      * @param mergee_clk_name Name of top level clk in mergee design.
      */
-    public void merge(Design mergee, String mergee_clk_name, PBlock block) {
+    public void merge(Design mergee, Connections connections) {
         if (original == null) {
-            insertFirstDesign(mergee, mergee_clk_name, block);
+            insertFirstDesign(mergee);
             return;
         }
         mergee.getNetlist().getTopCellInst(); // Creates a top cell inst. Must exist to be renamed.
@@ -87,7 +71,9 @@ public class Merge {
         // Logical netlist
         EDIFNetlist e = original.getNetlist();
 
-        EDIFCellInst mergeeInst = e.getTopCell().addCellInst(mergee.getNetlist().getTopCellInst());
+		// The following line is important even though the return variable is not used.
+		// EDIFCellInst mergeeInst = 
+		e.getTopCell().addCellInst(mergee.getNetlist().getTopCellInst());
         EDIFCell mergeeTop = mergee.getNetlist().getTopCell();
         mergeeTop.setView("netlist");
         e.getTopCell().getLibrary().addCell(mergeeTop);
@@ -108,22 +94,6 @@ public class Merge {
                 }
             }
         }
-        // **
-        // ** clk should already a port at the top instance if needed b/c the input dcps
-        // were generated ooc
-        // **
-
-        // Need to bring out clk net to top level
-        // EDIFNet clk = null;
-        // clk = original.getNetlist().getTopCell().getNet(clk_name);
-
-        // Connect the clock (assumes all probed signals are synchronous)
-        // if (clk != null)
-        // clk.createPortInst(mergeeTop.getPort(mergee_clk_name), mergeeInst);
-        // else if (clk_name != null)
-        // MessageGenerator
-        // .briefMessage("No clk found with name '" + clk_name + "' in design '" +
-        // original.getName() + "'");
 
         List<String> constraints = original.getXDCConstraints(ConstraintGroup.NORMAL);
         if (constraints == null) {
@@ -140,7 +110,13 @@ public class Merge {
             constraints.add(c);
         }
 
-        // place connect and route
+        connect(connections);
+    }
+
+    public void connect(Connections conn){
+        
+        connectPortsToGround(); // tmp
+
     }
 
     public void connect(Map<String, String> connections) {
