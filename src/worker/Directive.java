@@ -21,10 +21,15 @@ public class Directive {
 	File dcp = null;
 	String pblock_str = null;
 	boolean force = false;
-	// int order = -1;
+	boolean hand_placer = false;
+	boolean refresh = false;
 
 	public DirectiveHeader getHeader() {
 		return head;
+	}
+
+	public File getIII() {
+		return head.fsys().getRoot(FileSys.FILE_ROOT.III);
 	}
 
 	public BaseEnum getType() {
@@ -40,15 +45,27 @@ public class Directive {
 	}
 
 	public boolean isMerge() {
-		return (type == INST.TYPE.TypeEnum.merge);
+		return (type == INST.TYPE.TypeEnum.MERGE);
 	}
 
 	public boolean isWrite() {
-		return (type == INST.TYPE.TypeEnum.write);
+		return (type == INST.TYPE.TypeEnum.WRITE);
+	}
+
+	public boolean isInit() {
+		return (type == INST.TYPE.TypeEnum.INIT);
 	}
 
 	public boolean isForce() {
 		return force;
+	}
+
+	public boolean isRefresh() {
+		return refresh || head.refresh;
+	}
+
+	public boolean isHandPlacer() {
+		return hand_placer;
 	}
 
 	/**
@@ -63,14 +80,15 @@ public class Directive {
 		String inst_type_str = elem.getAttribute(INST.type.key);
 		type = INST.type.valueOf(inst_type_str);
 		if (type == null)
-			MessageGenerator.briefErrorAndExit("'type = \"" + inst_type_str + "\"' is not a valid attribute for 'inst'.\nExiting.");
+			MessageGenerator.briefErrorAndExit(
+					"'type = \"" + inst_type_str + "\"' is not a valid attribute for 'inst'.\nExiting.");
 
 		// file must exist if not tagged write (ie is an output file)
-		dcp = getDCPFile(elem, head.fsys(), type != INST.TYPE.TypeEnum.write);
+		dcp = getDCPFile(elem, head.fsys(), type != INST.TYPE.TypeEnum.WRITE);
 		pblock_str = getFirst(elem, INST.pblock);
 		force = getFirstBool(elem, INST.force);
-		// order = getFirstInt(elem, INST.order); // example of how to include an int
-		// from xml
+		hand_placer = getFirstBool(elem, INST.hand_placer);
+		refresh = getFirstBool(elem, INST.refresh);
 	}
 
 	static String getFirst(Element elem, TAG t) {
@@ -218,12 +236,26 @@ public class Directive {
 			}
 		}
 
+		static class NAME extends TAG {
+			NAME() {
+				super("name");
+			}
+		}
+
+		static class REFRESH extends TAG {
+			REFRESH() {
+				super("refresh");
+			}
+		}
+
 		static final III_DIR iii_dir = new III_DIR();
 		static final OOC_DIR ooc_dir = new OOC_DIR();
 		static final OUT_DIR out_dir = new OUT_DIR();
+		static final NAME name = new NAME();
+		static final REFRESH refresh = new REFRESH();
 
 		HEADER() {
-			super("header");
+			super("header", Arrays.asList(iii_dir, ooc_dir, out_dir, name, refresh), Arrays.asList());
 		}
 	}
 
@@ -252,7 +284,7 @@ public class Directive {
 			static final LOC loc = new LOC();
 
 			DCP() {
-				super("dcp");
+				super("dcp", Arrays.asList(), Arrays.asList(loc));
 			}
 		}
 
@@ -268,15 +300,21 @@ public class Directive {
 			}
 		}
 
-		// static class ORDER extends TAG {
-		// ORDER() {
-		// super("order");
-		// }
-		// }
+		static class HAND_PLACER extends TAG {
+			HAND_PLACER() {
+				super("hand_placer");
+			}
+		}
+
+		static class REFRESH extends TAG {
+			REFRESH() {
+				super("refresh");
+			}
+		}
 
 		static class TYPE extends KEY {
 			private enum TypeEnum implements BaseEnum {
-				merge("merge"), write("write");
+				MERGE("merge"), WRITE("write"), INIT("init");
 				final String tag_str;
 
 				TypeEnum(String tag_str) {
@@ -290,7 +328,7 @@ public class Directive {
 			}
 
 			TYPE() {
-				super("type", new HashSet<>(Arrays.asList(TypeEnum.merge, TypeEnum.write)));
+				super("type", new HashSet<>(Arrays.asList(TypeEnum.MERGE, TypeEnum.WRITE)));
 			}
 		}
 
@@ -298,12 +336,12 @@ public class Directive {
 		static final PBLOCK pblock = new PBLOCK();
 		static final TYPE type = new TYPE();
 		static final FORCE force = new FORCE();
-		// static final ORDER order = new ORDER();
+		static final HAND_PLACER hand_placer = new HAND_PLACER();
+		static final REFRESH refresh = new REFRESH();
 
 		INST() {
-			// super("inst", new ArrayList<TAG>(Arrays.asList(order, dcp, pblock)), new
-			// ArrayList<KEY>(Arrays.asList(type)));
-			super("inst", new ArrayList<TAG>(Arrays.asList(dcp, pblock)), new ArrayList<KEY>(Arrays.asList(type)));
+			super("inst", new ArrayList<TAG>(Arrays.asList(dcp, pblock, force, hand_placer, refresh)),
+					new ArrayList<KEY>(Arrays.asList(type)));
 		}
 	}
 

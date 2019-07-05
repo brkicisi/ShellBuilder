@@ -221,4 +221,18 @@ public class FileSys {
 
 		return f;
 	}
+
+	public File getRoot(FILE_ROOT root) {
+		switch (root) {
+		case III:
+			return iii_dir;
+		case OOC:
+			return ooc_dir;
+		case OUT:
+			return out_dir;
+		case PWD:
+		default:
+			return pwd_dir;
+		}
+	}
 }

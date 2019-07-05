@@ -2,11 +2,17 @@ package worker;
 
 import worker.Directive.HEADER;
 
+import java.io.File;
+
+import com.xilinx.rapidwright.util.MessageGenerator;
+
 import org.w3c.dom.Element;
 
 public class DirectiveHeader {
 	FileSys fsys = null;
 	boolean verbose = false;
+	boolean refresh = false;
+	String name;
 
 	public DirectiveHeader() {
 	}
@@ -33,6 +39,19 @@ public class DirectiveHeader {
 		text = Directive.getFirst(elem, HEADER.out_dir);
 		if (text != null)
 			setDirRoot(FileSys.FILE_ROOT.OUT, text);
+		
+		refresh = Directive.getFirstBool(elem, HEADER.refresh);
+
+		name = Directive.getFirst(elem, HEADER.name);
+		if(name != null && name.indexOf(' ') > 0){
+			printIfVerbose("Replacing spaces with underscores in input name '" + name + "'.");
+			name = name.replace(" ", "_");
+		}
+	}
+
+	private void printIfVerbose(String msg) {
+		if(verbose)
+			MessageGenerator.briefMessage(msg);
 	}
 
 	public void setVerbose(boolean verbose) {
@@ -43,6 +62,14 @@ public class DirectiveHeader {
 		if (fsys == null)
 			fsys = new FileSys(verbose);
 		fsys.setDirRoot(root, filename);
+	}
+
+	public File getIII() {
+		return (fsys == null) ? null : fsys.getRoot(FileSys.FILE_ROOT.III);
+	}
+
+	public String getName(){
+		return name;
 	}
 
 	public FileSys fsys() {

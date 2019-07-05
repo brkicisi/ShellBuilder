@@ -108,6 +108,20 @@ The exception to the above rule is `<inst>` which will be repeated many times (o
 		<td>Output directory.</td>
   	</tr>
 	<tr>
+		<td>1.4</td>
+    	<td>refresh</td>
+		<td></td>
+		<td></td>
+		<td>Place and route all modules ignoring and overwriting cached results.</td>
+  	</tr>
+	<tr>
+		<td>1.5</td>
+    	<td>name</td>
+		<td></td>
+		<td></td>
+		<td>Sets name to this if initializing a new design. Cannot contain spaces. Has no effect if starting with a base design.</td>
+  	</tr>
+	<tr>
 		<td>2</td>
     	<td>inst</td>
 		<td>2<strong>.</strong>?</td>
@@ -135,6 +149,20 @@ The exception to the above rule is `<inst>` which will be repeated many times (o
 		<td></td>
 		<td>Force overwrite of file with this name for this write only.</td>
   	</tr>
+	<tr>
+		<td>2.4</td>
+    	<td>refresh</td>
+		<td></td>
+		<td></td>
+		<td>Place and route this module ignoring and overwriting cached results.</td>
+  	</tr>
+	<tr>
+		<td>2.4</td>
+    	<td>hand_placer</td>
+		<td></td>
+		<td></td>
+		<td>Open RapidWright's HandPlacer to allow user to interactively place this module.</td>
+  	</tr>
 </table>
 <table>
 	<tr>
@@ -149,8 +177,8 @@ The exception to the above rule is `<inst>` which will be repeated many times (o
   	</tr>
 	<tr>
     	<td>type</td>
-		<td>merge, write</td>
-		<td>Type of operation to perform. Merge adds given dcp to design inside the given pblock. Write saves the current state to a dcp (default for write: iii_dir/something.dcp).</td>
+		<td>merge, write, init</td>
+		<td>Type of operation to perform. Merge adds given dcp to design inside the given pblock. Write saves the current state to a dcp. Init initializes other designs to merge with given base design. Init must only appear in first <em>inst</em> tag.</td>
   	</tr>
 </table>
 <!-- markdownlint-enable MD033 -->
@@ -171,12 +199,18 @@ It worked with it either included or not.
 -->
 <root>
   <header>
+    <name>New-Name</name>
     <iii_dir>/absolute/path/to/iii_dir</iii_dir>
     <ooc_dir>relative/path/from/pwd/to/ooc_dir</ooc_dir>
-    <out_dir></out_dir><!-- pwd is the output directory -->
+    <out_dir></out_dir><!-- the output directory is pwd -->
+    <!-- Note: unrecognized_token is not checked for -->
     <unrecognized_token>Unrecognized tokens are ignored.</unrecognized_token>
     <iii_dir>Repeated tokens are ignored.</iii_dir>
+    <refresh></refresh>
   </header>
+  <inst type = "inst">
+    <dcp>your_base_design.dcp</dcp>
+  </inst>
   <inst type = "merge">
     <dcp loc = "iii">relative/path/from/iii_dir/ooc_checkpoint_1.dcp</dcp>
     <pblock>SLICE_X0Y0:SLICE_X3Y5</pblock>
@@ -187,6 +221,7 @@ It worked with it either included or not.
   <inst type = "merge">
     <dcp loc = "ooc">../../other/dir/ooc_checkpoint_2.dcp</dcp>
     <pblock>SLICE_X0Y6:SLICE_X3Y11</pblock>
+	<hand_placer></hand_placer>
   </inst>
   <inst type = "merge">
     <dcp>path/from/pwd/to/dcp/ooc_checkpoint_3.dcp</dcp>
@@ -194,6 +229,7 @@ It worked with it either included or not.
   </inst>
   <inst type = "merge">
     <dcp>#out/path/relative/to/out_dir/ooc_checkpoint_3.dcp</dcp>
+	<refresh></refresh>
     <pblock>SLICE_X0Y20:SLICE_X7Y28</pblock>
   </inst>
   <inst type = "write">

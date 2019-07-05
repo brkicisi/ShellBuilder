@@ -1,8 +1,12 @@
 package top;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.blocks.PBlock;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.*;
+import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.util.MessageGenerator;
 
 import parser.Args;
@@ -11,7 +15,8 @@ import tcl.TCLEnum;
 import tcl.TCLScript;
 import util.DesignUtils;
 import worker.Merge;
-import worker.BuildDirectives;
+import worker.Merger;
+import worker.DirectiveBuilder;
 import worker.Connections;
 import worker.Directive;
 import worker.FileSys;
@@ -25,10 +30,12 @@ import java.util.Map;
 public class ShellBuilder {
 
 	ArgsContainer args = null;
-	final String TEMP_III_DIR = "/nfs/ug/thesis/thesis0/pc2019/Igi/shell/pieces/.iii";
+	Merge merge = null;
+	Merger merger1 = null;
+	Merger merger = null;
+	Connections connections = null;
 
 	public ShellBuilder() {
-
 	}
 
 	/**
@@ -41,6 +48,225 @@ public class ShellBuilder {
 			MessageGenerator.briefMessage(s);
 	}
 
+	/**
+	 * Ensure that if the user has not specified to force overwrite, output dcp
+	 * files don't collide with already existing files.
+	 */
+	private void checkFileCollision(Directive directive) {
+		if (args.force() || directive.isForce())
+			return;
+
+		boolean any_err = false;
+		File f = directive.getDCP();
+		if ((f != null) && f.exists()) {
+			MessageGenerator
+					.briefError("\nAn output dcp would overwrite another file at '" + f.getAbsolutePath() + "'.");
+			any_err = true;
+		}
+
+		// if any would overwrite, exit
+		if (any_err)
+			MessageGenerator.briefErrorAndExit("Use force (-f) to overwrite.\nExiting.\n");
+	}
+
+	/**
+	 * Supposed to merge cells using RW techniques adopted from Picoblaze
+	 * PreImplemented_Modules example
+	 * 
+	 * @param directive
+	 * @param mergee_dcp
+	 */
+	public void blackMagic(Directive directive, String mergee_dcp) {
+		Design mergee = DesignUtils.safeReadCheckpoint(mergee_dcp, args.verbose(), directive.getIII());
+		Module module = new Module(mergee);
+		merge.getDesign().getNetlist().migrateCellAndSubCells(module.getNetlist().getTopCell());
+
+		// boolean done = false;
+		// while (done == false) {
+		Site anchor_site = null, tmp_site = null;
+		for (int x = 1; x < 100; x++) {
+			if (anchor_site != null)
+				break;
+			for (int y = 1; y < 100; y++) {
+				String site_str = "SLICE_X" + x + "Y" + y;
+				tmp_site = merge.getDesign().getDevice().getSite(site_str);
+				if (module.isValidPlacement(tmp_site, merge.getDesign().getDevice(), merge.getDesign())) {
+					anchor_site = tmp_site;
+					break;
+				}
+			}
+		}
+
+		if (anchor_site != null
+				&& module.isValidPlacement(anchor_site, merge.getDesign().getDevice(), merge.getDesign())) {
+			System.out.println(anchor_site.getName());
+			ModuleInst mi = merge.getDesign().createModuleInst(mergee.getName(), module);
+			mi.getCellInst().setCellType(module.getNetlist().getTopCell());
+			mi.place(anchor_site);
+
+			HandPlacer.openDesign(merge.getDesign());
+		}
+		// }
+	}
+
+	// ! debug vars - comparable to preprocessor directives in C
+	public static final boolean runBlackMagic = false;
+	public static final boolean runMergerBasic = true;
+	public static final boolean runMergerSynth1 = false;
+
+	/**
+	 * Execute instructions provided by directive.
+	 * 
+	 * @param directive Instructions to execute.
+	 */
+	private void runDirective(Directive directive) {
+		if (directive.isInit()) {
+			// ignore if not first instruction. ie have already started building up a
+			// design.
+			if (merger != null) {
+				String dcp_str = (directive.getDCP() == null) ? "null" : directive.getDCP().getAbsolutePath();
+				printIfVerbose("Ignoring 'init' with dcp '" + dcp_str + "' since it is not the first instruction");
+				return;
+			}
+			if (directive.getDCP() == null) {
+				String name = directive.getHeader().getName();
+				if (name == null)
+					name = "top";
+				printIfVerbose("Initializing default merger base design with name '" + name + "'.");
+				merger = new Merger();
+				// Note: the design isn't actually initialized yet. It will only be initialized
+				// during first merge instruction.
+				return;
+			}
+			printIfVerbose("Initializing merger base design with dcp '" + directive.getDCP().getAbsolutePath() + "'.");
+			Design d = DesignUtils.safeReadCheckpoint(directive.getDCP(), args.verbose(), directive.getIII());
+			merger = new Merger(d);
+
+		}
+		if (directive.isMerge()) {
+			if (merger == null) {
+				String name = directive.getHeader().getName();
+				if (name == null)
+					name = "top";
+				printIfVerbose("Initializing default merger base design with name '" + name + "'.");
+				merger = new Merger();
+			}
+			if (runMergerBasic) {
+				merger.merge(directive, connections, args);
+			}
+
+			if (runBlackMagic) {
+				// TODO Try to find P&R dsgn in cache
+				// later
+
+				// TODO P&R separately inside pblock
+				// String mergee_dcp = Merge.placeRouteOOC(directive, args);
+
+				String mergee_dcp = directive.getIII().getAbsolutePath() + "/moduleCache/"
+						+ directive.getDCP().getName();
+				// Merge with partial design
+				blackMagic(directive, mergee_dcp);
+			}
+
+			// Design mergee = DesignUtils.safeReadCheckpoint(mergee_dcp, args.verbose(),
+			// directive.getIII());
+			// merge.merge(mergee);
+			// merge.connect(connections);
+			// Merge.lockPlacement(merge.getDesign());
+			// Merge.lockRouting(merge.getDesign());
+			if (runMergerSynth1) {
+				merger1.merge(directive, null, args);
+			}
+
+		} else if (directive.isWrite()) {
+			checkFileCollision(directive);
+
+			// TODO allow for default intermediate dcp names
+			if (directive.getDCP() == null)
+				System.err.println("Default intermediate dcp naming has not been implemented yet.");
+
+			if (runBlackMagic) {
+				String output_dcp1 = directive.getDCP().getAbsolutePath().replace(".dcp", "_old.dcp");
+				String output_dcp_bad_edif1 = output_dcp1.replace(".dcp", "_bad_edif.dcp");
+				printIfVerbose("Output dcp to '" + output_dcp1 + "'");
+				merge.getDesign().writeCheckpoint(output_dcp_bad_edif1);
+				// must fix all cells
+				DesignUtils.fixEdifInDCP(output_dcp_bad_edif1, output_dcp1, merge.getMergedCellNames(), args.verbose());
+			}
+			if (runMergerBasic) {
+				String output_dcp = directive.getDCP().getAbsolutePath();
+				// String output_dcp_bad_edif = output_dcp.replace(".dcp", "_bad_edif.dcp");
+				printIfVerbose("Output dcp to '" + output_dcp + "'");
+				// merger.writeCheckpoint(output_dcp_bad_edif);
+				merger.writeCheckpoint(output_dcp);
+
+				// TODO fix edif
+				// DesignUtils.fixEdifInDCPTop(output_dcp_bad_edif, output_dcp,
+				// merger.getModuleNames(), args.verbose());
+			}
+			if (runMergerSynth1) {
+				String output_dcp = directive.getDCP().getAbsolutePath().replace(".dcp", "_synth1.dcp");
+				merger1.writeCheckpoint(output_dcp);
+			}
+
+		} else {
+			MessageGenerator
+					.briefErrorAndExit("Unrecognized directive '" + directive.getType().getStr() + "'.\nExiting.");
+		}
+	}
+
+	public void start(String[] cmd_line_args) {
+		args = new ArgsContainer(cmd_line_args);
+
+		// tryMergeDriver(1);
+		// tryMergeDriver(2);
+		// tryPlace();
+		// tryConnectPorts();
+		// tryMergeLong();
+
+		File xml_directives = new FileSys(args.verbose()).getExistingFile(args.getOneArg(Args.Tag.XML_DIRECTIVES),
+				true);
+		DirectiveBuilder directive_builder = new DirectiveBuilder();
+		directive_builder.parse(xml_directives, args.verbose());
+
+		if (runBlackMagic) {
+			final String constant_dcp = "/thesis0/pc2019/Igi/shell/pieces/build/constant.dcp";
+			Design const_dsgn = DesignUtils.safeReadCheckpoint(constant_dcp, args.verbose(),
+					directive_builder.getHeader().getIII());
+			merge = new Merge(const_dsgn);
+		}
+		if (runMergerBasic) {
+			// connections = new Connections(
+			// "/nfs/ug/thesis/thesis0/pc2019/Igi/shell/pieces/tutorial_2/project_1/project_1.runs/synth_1/design_1_wrapper.dcp",
+			// directive_builder, args.verbose());
+			connections = new Connections();
+			connections.addConnection("design_1_axi_gpio_1_0_i/s_axi_aresetn", "design_1_axi_gpio_0_0_i/s_axi_aresetn");
+			connections.addConnection("design_1_axi_gpio_1_0_i/gpio_io_i[1:0]",
+					"design_1_axi_gpio_0_0_i/gpio_io_o[1:0]");
+		}
+		if (runMergerSynth1) {
+			final String synth1_dcp = "/thesis0/pc2019/Igi/shell/pieces/tutorial_2/project_1/project_1.runs/synth_1/design_1_wrapper.dcp";
+			Design d = DesignUtils.safeReadCheckpoint(synth1_dcp, args.verbose(),
+					directive_builder.getHeader().getIII());
+			merger1 = new Merger(d);
+		}
+		// this currently just executes everything (like refresh)
+		// it checks for cached designs, but doesn't check for partial solutions
+		for (Directive step : directive_builder.getDirectives())
+			runDirective(step);
+
+		MessageGenerator.briefMessage("\nFinished.");
+	}
+
+	public static void main(String[] args) {
+		ShellBuilder builder = new ShellBuilder();
+		builder.start(args);
+	}
+
+	// ! **********************************************************************
+
+	final String TEMP_III_DIR = "/nfs/ug/thesis/thesis0/pc2019/Igi/shell/pieces/.iii";
+
 	private void tryMerge(String d1, String clk1, String d2, String clk2, String dout) {
 		printIfVerbose("Trying to merge some designs.");
 		Design design1 = DesignUtils.safeReadCheckpoint(d1, true, TEMP_III_DIR);
@@ -48,7 +274,7 @@ public class ShellBuilder {
 		Design design2 = DesignUtils.safeReadCheckpoint(d2, true, TEMP_III_DIR);
 
 		Merge cat = new Merge(design1);
-		cat.merge(design2, null);
+		cat.merge(design2);
 
 		File output_dcp = new File(dout);
 		File output_dcp_bad = new File(dout.replace(".dcp", "_bad_edif.dcp"));
@@ -212,7 +438,7 @@ public class ShellBuilder {
 			d = DesignUtils.safeReadCheckpoint(ooc_dcps.get(i), true, TEMP_III_DIR);
 			PBlock block = new PBlock(d.getDevice(), pblock_range.get(i));
 			Connections conn = null;
-			cat.merge(d, conn);
+			cat.merge(d);
 
 			output_dcp = output_dcp_base.replace("1.dcp", (i + 1) + ".dcp");
 			String output_dcp_bad = output_dcp.replace(".dcp", "_bad_edif.dcp");
@@ -233,63 +459,5 @@ public class ShellBuilder {
 			script.add(TCLEnum.WRITE_EDIF);
 			script.run();
 		}
-	}
-
-	/**
-	 * Ensure that if the user has not specified to force overwrite, output dcp
-	 * files don't collide with already existing files.
-	 */
-	private void checkFileCollision(Directive directive) {
-		if (args.force() || directive.isForce())
-			return;
-
-		boolean any_err = false;
-		File f = directive.getDCP();
-		if ((f != null) && f.exists()) {
-			MessageGenerator.briefError("An output dcp would overwrite another file at '" + f.getAbsolutePath() + "'.");
-			any_err = true;
-		}
-		// if any would overwrite, exit
-		if (any_err)
-			MessageGenerator.briefErrorAndExit("Use force (-f) to overwrite.\nCanceling operation.\n");
-	}
-
-	private void runDirective(Directive directive) {
-		if (directive.isMerge()) {
-			System.out.println("merge: " + directive.getDCP().getAbsolutePath());
-
-		} else if (directive.isWrite()) {
-			System.out.println("write" + directive.getDCP().getAbsolutePath());
-			checkFileCollision(directive);
-
-		} else
-			MessageGenerator
-					.briefErrorAndExit("Unrecognized directive '" + directive.getType().getStr() + "'.\nExiting.");
-	}
-
-	public void start(String[] cmd_line_args) {
-		args = new ArgsContainer(cmd_line_args);
-
-		// tryMergeDriver(1);
-		// tryMergeDriver(2);
-		// tryPlace();
-		// tryConnectPorts();
-		// tryMergeLong();
-
-		File xml_directives = new FileSys(args.verbose()).getExistingFile(args.getOneArg(Args.Tag.XML_DIRECTIVES), true);
-		BuildDirectives directive_builder = new BuildDirectives();
-		directive_builder.parse(xml_directives, args.verbose());
-
-		// this currently just executes everything (like refresh)
-		// doesn't check for partial solutions
-		for (Directive step : directive_builder.getDirectives())
-			runDirective(step);
-
-		MessageGenerator.briefMessage("\nFinished.");
-	}
-
-	public static void main(String[] args) {
-		ShellBuilder builder = new ShellBuilder();
-		builder.start(args);
 	}
 }

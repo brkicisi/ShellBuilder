@@ -12,16 +12,16 @@ import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
 import org.w3c.dom.Element;
 
-public class BuildDirectives {
+public class DirectiveBuilder {
 	private ArrayDeque<Directive> directives = null;
 	private DirectiveHeader head = null;
 
 	
-	public BuildDirectives() {
+	public DirectiveBuilder() {
 		directives = new ArrayDeque<>();
 	}
 
-	public BuildDirectives(File input_file, boolean verbose) {
+	public DirectiveBuilder(File input_file, boolean verbose) {
 		this();
 		parse(input_file, verbose);
 	}
@@ -59,5 +59,8 @@ public class BuildDirectives {
 
 	public Collection<Directive> getDirectives() {
 		return Collections.unmodifiableCollection(directives);
+	}
+	public DirectiveHeader getHeader(){
+		return head;
 	}
 }
