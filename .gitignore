@@ -12,3 +12,4 @@ RapidWright/bin/**
 RapidWright/data/**
 RapidWright/jars/**
 
+hd_visual/*_pblock_*.tcl

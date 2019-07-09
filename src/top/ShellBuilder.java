@@ -138,9 +138,9 @@ public class ShellBuilder {
 				// during first merge instruction.
 				return;
 			}
-			printIfVerbose("Initializing merger base design with dcp '" + directive.getDCP().getAbsolutePath() + "'.");
+			printIfVerbose("Initializing merger with base design '" + directive.getDCP().getAbsolutePath() + "'.");
 			Design d = DesignUtils.safeReadCheckpoint(directive.getDCP(), args.verbose(), directive.getIII());
-			merger = new Merger(d);
+			merger = new Merger(d, directive.getHeader(), args);
 
 		}
 		if (directive.isMerge()) {
@@ -248,7 +248,8 @@ public class ShellBuilder {
 			final String synth1_dcp = "/thesis0/pc2019/Igi/shell/pieces/tutorial_2/project_1/project_1.runs/synth_1/design_1_wrapper.dcp";
 			Design d = DesignUtils.safeReadCheckpoint(synth1_dcp, args.verbose(),
 					directive_builder.getHeader().getIII());
-			merger1 = new Merger(d);
+
+			merger1 = new Merger(d, directive_builder.getHeader(), args);
 		}
 		// this currently just executes everything (like refresh)
 		// it checks for cached designs, but doesn't check for partial solutions

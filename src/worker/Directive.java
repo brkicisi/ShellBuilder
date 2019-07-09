@@ -18,6 +18,7 @@ import org.w3c.dom.Node;
 public class Directive {
 	private DirectiveHeader head = null;
 	BaseEnum type = null;
+	String inst_name = null;
 	File dcp = null;
 	String pblock_str = null;
 	boolean force = false;
@@ -38,6 +39,10 @@ public class Directive {
 
 	public String getPBlockStr() {
 		return pblock_str;
+	}
+
+	public String getInstName(){
+		return inst_name;
 	}
 
 	public File getDCP() {
@@ -86,6 +91,7 @@ public class Directive {
 		// file must exist if not tagged write (ie is an output file)
 		dcp = getDCPFile(elem, head.fsys(), type != INST.TYPE.TypeEnum.WRITE);
 		pblock_str = getFirst(elem, INST.pblock);
+		inst_name = getFirst(elem, INST.inst_name);
 		force = getFirstBool(elem, INST.force);
 		hand_placer = getFirstBool(elem, INST.hand_placer);
 		refresh = getFirstBool(elem, INST.refresh);
@@ -294,6 +300,12 @@ public class Directive {
 			}
 		}
 
+		static class INST_NAME extends TAG {
+			INST_NAME() {
+				super("name");
+			}
+		}
+
 		static class FORCE extends TAG {
 			FORCE() {
 				super("force");
@@ -334,6 +346,7 @@ public class Directive {
 
 		static final DCP dcp = new DCP();
 		static final PBLOCK pblock = new PBLOCK();
+		static final INST_NAME inst_name = new INST_NAME();
 		static final TYPE type = new TYPE();
 		static final FORCE force = new FORCE();
 		static final HAND_PLACER hand_placer = new HAND_PLACER();

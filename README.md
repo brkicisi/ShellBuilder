@@ -144,20 +144,27 @@ The exception to the above rule is `<inst>` which will be repeated many times (o
   	</tr>
 	<tr>
 		<td>2.3</td>
+    	<td>name</td>
+		<td></td>
+		<td></td>
+		<td>Name to give this instance of the dcp module.</td>
+  	</tr>
+	<tr>
+		<td>2.4</td>
     	<td>force</td>
 		<td></td>
 		<td></td>
 		<td>Force overwrite of file with this name for this write only.</td>
   	</tr>
 	<tr>
-		<td>2.4</td>
+		<td>2.5</td>
     	<td>refresh</td>
 		<td></td>
 		<td></td>
 		<td>Place and route this module ignoring and overwriting cached results.</td>
   	</tr>
 	<tr>
-		<td>2.4</td>
+		<td>2.6</td>
     	<td>hand_placer</td>
 		<td></td>
 		<td></td>

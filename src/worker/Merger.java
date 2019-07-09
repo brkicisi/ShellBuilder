@@ -2,27 +2,32 @@ package worker;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
-import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
-import com.xilinx.rapidwright.examples.SLRCrosserGenerator;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -35,24 +40,37 @@ import util.DesignUtils;
 public class Merger {
 	Design design = null;
 	Device device = null;
+	EDIFNetlist synth_netlist = null;
 
 	public Merger() {
 	}
 
-	public Merger(String device_str, String name) {
-		if (name == null)
-			init(new Design("top", device_str));
-		else
-			init(new Design(name, device_str));
+	public Merger(Design design, DirectiveHeader head, ArgsContainer args) {
+		init(design, head, args);
 	}
 
-	public Merger(Design design) {
-		init(design);
-	}
-
-	public void init(Design design) {
+	public void init(Design design, DirectiveHeader head, ArgsContainer args) {
 		this.design = design;
 		device = design.getDevice();
+
+		// TODO load this from header
+		final String synth_dcp = "/thesis0/pc2019/Igi/shell/pieces/tutorial_2/project_1/project_1.runs/synth_1/design_1_wrapper.dcp";
+		Design synth = DesignUtils.safeReadCheckpoint(synth_dcp, args.verbose(), head.getIII());
+		synth_netlist = synth.getNetlist();
+
+		EDIFCell synth_curr = synth_netlist.getCell(head.getName());
+		if (synth_curr != null)
+			for (EDIFCellInst inst : synth_curr.getCellInsts())
+				design.getNetlist().migrateCellAndSubCells(inst.getCellType()); // TODO do I need both?
+
+		// TODO call setAutoIOBuffers or not based on if this is at top level of hierarchy.
+		design.setAutoIOBuffers(false);
+
+		EDIFCell top = design.getNetlist().getTopCell();
+		EDIFCell synth_top = synth_netlist.getCell(head.getName());
+		for (EDIFPort synth_port : synth_top.getPorts())
+			if (top.getPort(synth_port.getBusName()) == null)
+				top.createPort(synth_port.getName(), synth_port.getDirection(), synth_port.getWidth());
 	}
 
 	/**
@@ -68,12 +86,14 @@ public class Merger {
 		Module mod = fetchAndPrepModule(directive, args);
 		if (design == null) {
 			if (directive.getHeader().getName() != null)
-				init(new Design(directive.getHeader().getName(), mod.getDevice().getDeviceName()));
+				init(new Design(directive.getHeader().getName(), mod.getDevice().getDeviceName()),
+						directive.getHeader(), args);
 			else
-				init(new Design("top", mod.getDevice().getDeviceName()));
+				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
 		}
 		ModuleInst mi = insertOOC(mod, directive);
-		connectAll(mi, conns);
+		// connectAll(mi, conns);
+		connectAll(directive.getHeader(), args);
 	}
 
 	/**
@@ -132,14 +152,16 @@ public class Merger {
 		mod.setPBlock(directive.getPBlockStr());
 		if (design == null) {
 			if (directive.getHeader().getName() != null)
-				init(new Design(directive.getHeader().getName(), mod.getDevice().getDeviceName()));
+				init(new Design(directive.getHeader().getName(), mod.getDevice().getDeviceName()),
+						directive.getHeader(), args);
 			else
-				init(new Design("top", mod.getDevice().getDeviceName()));
+				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
 		}
 		// intended to remove black box (will end up removing any previous
 		// implementation of the cell)
-		design.getNetlist().getWorkLibrary().removeCell(mod.getNetlist().getTopCell().getName());
-		design.getNetlist().migrateCellAndSubCells(mod.getNetlist().getTopCell());
+		// design.getNetlist().getWorkLibrary().removeCell(mod.getNetlist().getTopCell().getName());
+		// design.getNetlist().migrateCellAndSubCells(mod.getNetlist().getTopCell());
+		myMigrateCellAndSubCells(mod.getNetlist().getTopCell()); // TODO do I need both?
 
 		if (was_already_cached)
 			printIfVerbose("\nLoaded cached module '" + mod_name + "'", verbose);
@@ -179,6 +201,7 @@ public class Merger {
 		script.addCustomCmd("resize_pblock -add " + directive.getPBlockStr() + " [get_pblocks " + pblock_name + "]");
 		script.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells]");
 		script.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
+		script.addCustomCmd("set_property SNAPPING_MODE ROUTING [get_pblocks " + pblock_name + "]");
 		// todo opt?
 		// script.add(TCLEnum.OPT);
 		script.add(TCLEnum.PLACE);
@@ -198,17 +221,16 @@ public class Merger {
 	 */
 	private ModuleInst insertOOC(Module mod, Directive directive) {
 		// TODO set mi name if duplicate
-		// ModuleInst mi = design.createModuleInst(mod.getName() + "_i", mod);
-		// mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
 		ModuleInst mi = null;
-		PBlock block = new PBlock(device, directive.getPBlockStr());
+		// PBlock block = new PBlock(device, directive.getPBlockStr());
 
 		// TODO better auto placer
+
 		Site anchor_site = null, tmp_site = null;
-		for (int x = 1; x < 100; x++) {
+		for (int x = 0; x < 100; x++) {
 			if (anchor_site != null)
 				break;
-			for (int y = 1; y < 100; y++) {
+			for (int y = 0; y < 100; y++) {
 				String site_str = "SLICE_X" + x + "Y" + y;
 				tmp_site = device.getSite(site_str);
 				if (mod.isValidPlacement(tmp_site, device, design)) {
@@ -219,7 +241,10 @@ public class Merger {
 		}
 
 		if (anchor_site != null && mod.isValidPlacement(anchor_site, device, design)) {
-			mi = design.createModuleInst(mod.getName() + "_i", mod);
+			String mi_name = directive.getInstName();
+			if (mi_name == null)
+				mi_name = mod.getName() + "_i";
+			mi = design.createModuleInst(mi_name, mod);
 			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
 			MessageGenerator
 					.briefMessage("Placing module instance '" + mi.getName() + "' at '" + anchor_site.getName() + "'.");
@@ -254,6 +279,41 @@ public class Merger {
 		return mi;
 	}
 
+	private EDIFNet getOrMakeEDIFNet(String name, EDIFCell parentCell) {
+		EDIFNet net = parentCell.getNet(name);
+		if (net != null)
+			return net;
+		return new EDIFNet(name, parentCell);
+	}
+
+	private void connectAll(DirectiveHeader head, ArgsContainer args) {
+		EDIFCell top = design.getNetlist().getTopCell();
+		EDIFCell synth_top = synth_netlist.getCell(head.getName());
+
+		for (EDIFNet synth_net : synth_top.getNets()) {
+			for (EDIFPortInst synth_pi : synth_net.getPortInsts()) {
+				if (synth_pi.isTopLevelPort()) {
+					EDIFPort port = top.getPort(synth_pi.getPort().getName());
+					if (port == null)
+						continue;
+					getOrMakeEDIFNet(synth_net.getName(), top).createPortInst(port, synth_pi.getIndex());
+					EDIFNet n = getOrMakeEDIFNet(synth_net.getName(), top);
+					n.getPortInsts();
+				} else {
+					EDIFCellInst ci = top.getCellInst(synth_pi.getCellInst().getName());
+					if (ci == null)
+						continue;
+					EDIFPort port = ci.getCellType().getPort(synth_pi.getPort().getName());
+					if (port == null)
+						continue;
+					getOrMakeEDIFNet(synth_net.getName(), top).createPortInst(port, synth_pi.getIndex(), ci);
+					EDIFNet n = getOrMakeEDIFNet(synth_net.getName(), top);
+					n.getPortInsts();
+				}
+			}
+		}
+	}
+
 	/**
 	 * Makes as many connections as it can find between this module instance and the
 	 * rest of the design.
@@ -269,48 +329,63 @@ public class Merger {
 			return;
 
 		EDIFCell top = design.getNetlist().getTopCell();
-		final String CLK = "s_axi_aclk";
-		final String RST = "s_axi_aresetn";
+		final String CLK = "clk_100MHz";
+		final String RST = "reset_rtl_0";
 		if (top.getNet(CLK) == null) {
 			// Create clk and rst
-			// TODO figure out how to set io buffers for all but clk
-			// design.setAutoIOBuffers(false);
-			EDIFPort top_clk_port = top.createPort(CLK, EDIFDirection.INPUT, 1);
+			design.setAutoIOBuffers(false);
+			// TODO figure out how to set IO buffers for all but clk (if top module not
+			// adding to synth_1)
 			EDIFNet clk = top.addNet(new EDIFNet(CLK, top));
-			clk.createPortInst(top_clk_port);
-			// design.setAutoIOBuffers(true);
+			clk.createPortInst(top.createPort(CLK, EDIFDirection.INPUT, 1));
 			top.createPort(RST, EDIFDirection.INPUT, 1);
 			top.addNet(new EDIFNet(RST, top));
+
+			// ! TEMP GROUNDING
+			EDIFNet gnd_net = EDIFTools.getStaticNet(NetType.GND, top, design.getNetlist());
+
+			gnd_net.createPortInst(top.createPort("uart_rtl_0_rxd", EDIFDirection.INPUT, 1));
+			EDIFPort port = top.createPort("gpio_io_i_0[1:0]", EDIFDirection.INPUT, 2);
+			gnd_net.createPortInst(port, 0);
+			gnd_net.createPortInst(port, 1);
+			gnd_net.createPortInst(top.createPort("uart_rtl_0_txd", EDIFDirection.OUTPUT, 1));
+			port = top.createPort("gpio_io_o_0[1:0]", EDIFDirection.OUTPUT, 2);
+			gnd_net.createPortInst(port, 0);
+			gnd_net.createPortInst(port, 1);
+
 		}
 		EDIFNet clk = top.getNet(CLK);
-		clk.createPortInst(CLK, mi.getCellInst());
-		mi.connect(RST, RST);
+		// clk.createPortInst(CLK, mi.getCellInst());
+		clk.createPortInst("s_axi_aclk", mi.getCellInst());
+		mi.connect("s_axi_aresetn", RST);
 
 		for (ModuleInst modi : design.getModuleInsts()) {
 			if (mi == modi)
 				continue;
 
-		
 		}
-		if (mi != null)
-			return;
+		// if (mi != null)
+		// return;
 
-		EDIFCellInst mi_cell_i = design.getNetlist().getCellInstFromHierName(mi.getName());
-		EDIFCell top_cell = design.getNetlist().getTopCell();
+		// EDIFCellInst mi_cell_i =
+		// design.getNetlist().getCellInstFromHierName(mi.getName());
+		// EDIFCell top_cell = design.getNetlist().getTopCell();
 
-		for (EDIFPort mi_port : mi_cell_i.getCellPorts()) {
-			MyPort sourcep = new MyPort(mi_port.getBusName());
-			Set<MyPort> sinks = conns.getSinks(mi_cell_i.getName(), mi_port.getBusName());
-			if (sinks == null)
-				continue;
+		// for (EDIFPort mi_port : mi_cell_i.getCellPorts()) {
+		// MyPort sourcep = new MyPort(mi_port.getBusName());
+		// Set<MyPort> sinks = conns.getSinks(mi_cell_i.getName(),
+		// mi_port.getBusName());
+		// if (sinks == null)
+		// continue;
 
-			for (MyPort sinkp : sinks) {
-				EDIFCellInst other_cell_i = design.getNetlist().getCellInstFromHierName(sinkp.getModuleInst());
-				EDIFPort other_port = other_cell_i.getPort(sinkp.getPortBusName());
+		// for (MyPort sinkp : sinks) {
+		// EDIFCellInst other_cell_i =
+		// design.getNetlist().getCellInstFromHierName(sinkp.getModuleInst());
+		// EDIFPort other_port = other_cell_i.getPort(sinkp.getPortBusName());
 
-				edifConnect(top_cell, mi_cell_i, mi_port, other_cell_i, other_port);
-			}
-		}
+		// edifConnect(top_cell, mi_cell_i, mi_port, other_cell_i, other_port);
+		// }
+		// }
 	}
 
 	/**
@@ -374,8 +449,12 @@ public class Merger {
 	}
 
 	public void writeCheckpoint(String filename) {
-		if (design != null)
+		if (design != null) {
+			// final String CLK = "s_axi_aclk";
+			// design.addXDCConstraint("create_generated_clock -name " + CLK + " [get_nets "
+			// + CLK + "]");
 			design.writeCheckpoint(filename);
+		}
 	}
 
 	public static void lockPlacement(Design d) {
@@ -389,6 +468,41 @@ public class Merger {
 		for (Net n : d.getNets()) {
 			for (PIP p : n.getPIPs()) {
 				p.setIsPIPFixed(true);
+			}
+		}
+	}
+
+	/**
+	 * Modified from EDIFNetlist.migrate_cellAndSubCells()
+	 * 
+	 * This should do the same except that it replaces blackboxes.
+	 * 
+	 * @param cell Cell to merge (along with its subcells) into design.getNetlist().
+	 */
+	private void myMigrateCellAndSubCells(EDIFCell cell) {
+		EDIFNetlist netlist = design.getNetlist();
+		Queue<EDIFCell> cells = new LinkedList<>();
+		cells.add(cell);
+		while (!cells.isEmpty()) {
+			EDIFCell curr = cells.poll();
+			EDIFLibrary destLib = netlist.getLibrary(curr.getLibrary().getName());
+			if (destLib == null) {
+				if (curr.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
+					destLib = netlist.getHDIPrimitivesLibrary();
+				} else {
+					destLib = netlist.getWorkLibrary();
+				}
+			}
+
+			if (!destLib.containsCell(curr)) {
+				destLib.addCell(curr);
+			} else if (curr.hasContents()) {
+				destLib.removeCell(curr.getName());
+				destLib.addCell(curr);
+			}
+
+			for (EDIFCellInst inst : curr.getCellInsts()) {
+				cells.add(inst.getCellType());
 			}
 		}
 	}
