@@ -1,26 +1,24 @@
 package worker;
 
 import java.io.File;
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Module;
-import com.xilinx.rapidwright.design.ModuleImpls;
 import com.xilinx.rapidwright.design.ModuleInst;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
-import com.xilinx.rapidwright.design.Port;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
@@ -35,12 +33,15 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 import parser.ArgsContainer;
 import tcl.TCLEnum;
 import tcl.TCLScript;
+import directive.*;
 import util.DesignUtils;
 
 public class Merger {
-	Design design = null;
-	Device device = null;
-	EDIFNetlist synth_netlist = null;
+	private Design design = null;
+	private Device device = null;
+	private EDIFNetlist synth_netlist = null;
+	private Set<String> wire_cells = new HashSet<>();
+	private File final_dcp = null;
 
 	public Merger() {
 	}
@@ -49,25 +50,31 @@ public class Merger {
 		init(design, head, args);
 	}
 
-	public void init(Design design, DirectiveHeader head, ArgsContainer args) {
-		this.design = design;
+	public void init(Design d, DirectiveHeader head, ArgsContainer args) {
+		design = d;
+		design.setDesignOutOfContext(!head.isBufferedInputs());
+		design.setAutoIOBuffers(head.isBufferedInputs());
 		device = design.getDevice();
 
-		// TODO load this from header
-		final String synth_dcp = "/thesis0/pc2019/Igi/shell/pieces/tutorial_2/project_1/project_1.runs/synth_1/design_1_wrapper.dcp";
+		File synth_dcp = head.getTopLevelSynth();
+		if (synth_dcp == null)
+			return;
+
 		Design synth = DesignUtils.safeReadCheckpoint(synth_dcp, args.verbose(), head.getIII());
 		synth_netlist = synth.getNetlist();
 
-		EDIFCell synth_curr = synth_netlist.getCell(head.getName());
-		if (synth_curr != null)
-			for (EDIFCellInst inst : synth_curr.getCellInsts())
-				design.getNetlist().migrateCellAndSubCells(inst.getCellType()); // TODO do I need both?
-
-		// TODO call setAutoIOBuffers or not based on if this is at top level of hierarchy.
-		design.setAutoIOBuffers(false);
-
 		EDIFCell top = design.getNetlist().getTopCell();
-		EDIFCell synth_top = synth_netlist.getCell(head.getName());
+		EDIFCell synth_top = synth_netlist.getCell(top.getName());
+		if (synth_top == null)
+			return;
+
+		for (EDIFCellInst synth_inst : synth_top.getCellInsts()){
+			EDIFCell synth_cell = synth_inst.getCellType();
+			design.getNetlist().migrateCellAndSubCells(synth_cell);
+			if(synth_cell.isPrimitive())
+				new EDIFCellInst(synth_inst.getName(), synth_cell, top);
+		}
+
 		for (EDIFPort synth_port : synth_top.getPorts())
 			if (top.getPort(synth_port.getBusName()) == null)
 				top.createPort(synth_port.getName(), synth_port.getDirection(), synth_port.getWidth());
@@ -76,13 +83,12 @@ public class Merger {
 	/**
 	 * Top level functions to fetch dcp (from Directive:getDCP() or from
 	 * .iii/cache), insert it into this.design and connect as many connections as it
-	 * can find.
+	 * can find using top level synthesized design from header.
 	 * 
 	 * @param directive Merge directive including the dcp to be merged.
-	 * @param conns     Connections to make if possible.
 	 * @param args      Command line args.
 	 */
-	public void merge(Directive directive, Connections conns, ArgsContainer args) {
+	public void merge(Directive directive, ArgsContainer args) {
 		Module mod = fetchAndPrepModule(directive, args);
 		if (design == null) {
 			if (directive.getHeader().getName() != null)
@@ -91,8 +97,7 @@ public class Merger {
 			else
 				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
 		}
-		ModuleInst mi = insertOOC(mod, directive);
-		// connectAll(mi, conns);
+		insertOOC(mod, directive);
 		connectAll(directive.getHeader(), args);
 	}
 
@@ -111,9 +116,13 @@ public class Merger {
 		Module mod = null;
 		boolean verbose = (args == null) ? false : args.verbose();
 
-		if (directive.getDCP() == null)
-			MessageGenerator.briefErrorAndExit("\nNo dcp in merge directive.\nExiting.");
-		else if (!directive.getDCP().exists())
+		if (directive.getDCP() == null) {
+			if (directive.isOnlyWires()) {
+				wire_cells.add(directive.getInstName());
+				return null;
+			} else
+				MessageGenerator.briefErrorAndExit("\nNo dcp in merge directive.\nExiting.");
+		} else if (!directive.getDCP().exists())
 			MessageGenerator.briefErrorAndExit("\nCould not find dcp '" + directive.getDCP().getAbsolutePath()
 					+ "' specified in merge directive.\nExiting.");
 
@@ -161,7 +170,7 @@ public class Merger {
 		// implementation of the cell)
 		// design.getNetlist().getWorkLibrary().removeCell(mod.getNetlist().getTopCell().getName());
 		// design.getNetlist().migrateCellAndSubCells(mod.getNetlist().getTopCell());
-		myMigrateCellAndSubCells(mod.getNetlist().getTopCell()); // TODO do I need both?
+		myMigrateCellAndSubCells(mod.getNetlist().getTopCell());
 
 		if (was_already_cached)
 			printIfVerbose("\nLoaded cached module '" + mod_name + "'", verbose);
@@ -177,28 +186,21 @@ public class Merger {
 	 * @param args      Arguments from command line.
 	 * @return String where output was written.
 	 */
-	public static String placeRouteOOC(Directive directive, ArgsContainer args) {
-		// Connect external ports to gnd
-		boolean verbose = (args == null) ? false : args.verbose();
-		Design d = DesignUtils.safeReadCheckpoint(directive.getDCP(), verbose, directive.getIII());
-
-		d.getNetlist().getTopCellInst();
-		d.getNetlist().renameNetlistAndTopCell(d.getName());
-
+	private static String placeRouteOOC(Directive directive, ArgsContainer args) {
 		// create cache folder in iii
 		File cache_dir = new File(directive.getIII(), "moduleCache");
 		if (!cache_dir.isDirectory())
 			cache_dir.mkdirs();
 
-		String output_dcp = cache_dir.getAbsolutePath() + "/" + directive.getDCP().getName();
-		d.writeCheckpoint(output_dcp);
-
-		String pblock_name = d.getName() + "_pblock";
+		String pblock_name = "[get_property TOP [current_design ]]" + "_pblock";
 		String options = (args == null) ? "f" : args.options("f");
-		TCLScript script = new TCLScript(output_dcp, output_dcp, options,
-				directive.getIII().getAbsolutePath() + "/pblock_place_route_step.tcl");
+		String input_dcp = directive.getDCP().getAbsolutePath();
+		String output_dcp = cache_dir.getAbsolutePath() + "/" + directive.getDCP().getName();
+		String tcl_script_file = directive.getIII().getAbsolutePath() + "/pblock_place_route_step.tcl";
+
+		TCLScript script = new TCLScript(input_dcp, output_dcp, options, tcl_script_file);
 		script.addCustomCmd("create_pblock " + pblock_name);
-		script.addCustomCmd("resize_pblock -add " + directive.getPBlockStr() + " [get_pblocks " + pblock_name + "]");
+		script.addCustomCmd("resize_pblock -add {" + directive.getPBlockStr() + "} [get_pblocks " + pblock_name + "]");
 		script.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells]");
 		script.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
 		script.addCustomCmd("set_property SNAPPING_MODE ROUTING [get_pblocks " + pblock_name + "]");
@@ -220,7 +222,9 @@ public class Merger {
 	 * @param directive Merge directive including whether to open handplacer.
 	 */
 	private ModuleInst insertOOC(Module mod, Directive directive) {
-		// TODO set mi name if duplicate
+		if (mod == null)
+			return null;
+
 		ModuleInst mi = null;
 		// PBlock block = new PBlock(device, directive.getPBlockStr());
 
@@ -230,7 +234,7 @@ public class Merger {
 		for (int x = 0; x < 100; x++) {
 			if (anchor_site != null)
 				break;
-			for (int y = 0; y < 100; y++) {
+			for (int y = 0; y < 200; y++) {
 				String site_str = "SLICE_X" + x + "Y" + y;
 				tmp_site = device.getSite(site_str);
 				if (mod.isValidPlacement(tmp_site, device, design)) {
@@ -242,6 +246,7 @@ public class Merger {
 
 		if (anchor_site != null && mod.isValidPlacement(anchor_site, device, design)) {
 			String mi_name = directive.getInstName();
+			// TODO set mi name if duplicate
 			if (mi_name == null)
 				mi_name = mod.getName() + "_i";
 			mi = design.createModuleInst(mi_name, mod);
@@ -287,31 +292,76 @@ public class Merger {
 	}
 
 	private void connectAll(DirectiveHeader head, ArgsContainer args) {
+		if (synth_netlist == null) {
+			printIfVerbose("\nNo top level synth loaded. Can't make any connections.", args.verbose());
+			return;
+		}
+
 		EDIFCell top = design.getNetlist().getTopCell();
-		EDIFCell synth_top = synth_netlist.getCell(head.getName());
+		EDIFCell synth_top = synth_netlist.getCell(top.getName());
+
+		for (String ci_name : wire_cells) {
+			EDIFCellInst synth_ci = synth_top.getCellInst(ci_name);
+			if (synth_ci == null) {
+				printIfVerbose("Couldn't find wire cell instance '" + ci_name + "'.", args.verbose());
+				continue;
+			}
+			String cell_name = synth_ci.getCellName();
+			EDIFNetlist edifnetlist = new EDIFNetlist(synth_ci.getCellName());
+			edifnetlist.migrateCellAndSubCells(synth_ci.getCellType());
+			EDIFCell cell = edifnetlist.getCell(cell_name);
+			EDIFDesign edifdsgn = new EDIFDesign(cell_name);
+			edifdsgn.setTopCell(cell);
+			edifnetlist.setDesign(edifdsgn);
+			Design d = new Design(synth_ci.getName(), design.getPartName());
+			d.setNetlist(edifnetlist);
+			Module mod = new Module(d);
+			ModuleInst mi = design.createModuleInst(synth_ci.getName(), mod);
+			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
+			wire_cells.remove(ci_name);
+		}
 
 		for (EDIFNet synth_net : synth_top.getNets()) {
 			for (EDIFPortInst synth_pi : synth_net.getPortInsts()) {
 				if (synth_pi.isTopLevelPort()) {
-					EDIFPort port = top.getPort(synth_pi.getPort().getName());
+					EDIFPort port = top.getPort(synth_pi.getPort().getBusName());
 					if (port == null)
 						continue;
 					getOrMakeEDIFNet(synth_net.getName(), top).createPortInst(port, synth_pi.getIndex());
-					EDIFNet n = getOrMakeEDIFNet(synth_net.getName(), top);
-					n.getPortInsts();
 				} else {
 					EDIFCellInst ci = top.getCellInst(synth_pi.getCellInst().getName());
 					if (ci == null)
 						continue;
-					EDIFPort port = ci.getCellType().getPort(synth_pi.getPort().getName());
+					EDIFPort port = ci.getCellType().getPort(synth_pi.getPort().getBusName());
 					if (port == null)
 						continue;
 					getOrMakeEDIFNet(synth_net.getName(), top).createPortInst(port, synth_pi.getIndex(), ci);
-					EDIFNet n = getOrMakeEDIFNet(synth_net.getName(), top);
-					n.getPortInsts();
 				}
 			}
 		}
+	}
+
+	/**
+	 * Places and routes a dcp and writes the routed design back to the same file
+	 * location.
+	 */
+	public void placeAndRoute(File inout_file, DirectiveHeader head, ArgsContainer args) {
+		// TODO lock P&R
+		lockPlacement(design);
+		lockRouting(design);
+
+		String options = (args == null) ? "f" : args.options("f");
+		String inout_dcp = inout_file.getAbsolutePath();
+		String tcl_script_file = head.getIII().getAbsolutePath() + "/pblock_place_route_step.tcl";
+
+		TCLScript script = new TCLScript(inout_dcp, inout_dcp, options, tcl_script_file);
+		// todo opt?
+		// script.add(TCLEnum.OPT);
+		script.add(TCLEnum.PLACE);
+		script.add(TCLEnum.ROUTE);
+		script.add(TCLEnum.WRITE_DCP);
+		script.add(TCLEnum.WRITE_EDIF);
+		script.run();
 	}
 
 	/**
@@ -448,13 +498,21 @@ public class Merger {
 			MessageGenerator.briefMessage(msg);
 	}
 
+	public void setFinalDCP(File out_dcp) {
+		final_dcp = out_dcp;
+	}
+
+	public File getFinalDCP() {
+		return final_dcp;
+	}
+
+	public void writeCheckpoint(File dcp_file) {
+		writeCheckpoint(dcp_file.getAbsolutePath());
+	}
+
 	public void writeCheckpoint(String filename) {
-		if (design != null) {
-			// final String CLK = "s_axi_aclk";
-			// design.addXDCConstraint("create_generated_clock -name " + CLK + " [get_nets "
-			// + CLK + "]");
+		if (design != null)
 			design.writeCheckpoint(filename);
-		}
 	}
 
 	public static void lockPlacement(Design d) {

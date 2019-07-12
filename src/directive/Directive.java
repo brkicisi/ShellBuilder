@@ -1,4 +1,4 @@
-package worker;
+package directive;
 
 import java.io.File;
 import java.util.Collections;
@@ -13,10 +13,12 @@ import java.util.Set;
 import com.xilinx.rapidwright.util.MessageGenerator;
 
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
+
+import parser.XMLParser;
+import worker.FileSys;
 
 public class Directive {
-	private DirectiveHeader head = null;
+	DirectiveHeader head = null;
 	BaseEnum type = null;
 	String inst_name = null;
 	File dcp = null;
@@ -24,6 +26,8 @@ public class Directive {
 	boolean force = false;
 	boolean hand_placer = false;
 	boolean refresh = false;
+	boolean only_wires = false;
+	DirectiveBuilder sub_builder = null;
 
 	public DirectiveHeader getHeader() {
 		return head;
@@ -41,12 +45,16 @@ public class Directive {
 		return pblock_str;
 	}
 
-	public String getInstName(){
+	public String getInstName() {
 		return inst_name;
 	}
 
 	public File getDCP() {
 		return dcp;
+	}
+
+	public DirectiveBuilder getSubBuilder() {
+		return sub_builder;
 	}
 
 	public boolean isMerge() {
@@ -57,8 +65,8 @@ public class Directive {
 		return (type == INST.TYPE.TypeEnum.WRITE);
 	}
 
-	public boolean isInit() {
-		return (type == INST.TYPE.TypeEnum.INIT);
+	public boolean isSubBuilder() {
+		return (type == INST.TYPE.TypeEnum.BUILD);
 	}
 
 	public boolean isForce() {
@@ -66,11 +74,19 @@ public class Directive {
 	}
 
 	public boolean isRefresh() {
-		return refresh || head.refresh;
+		return refresh || head.isRefresh();
+	}
+
+	public boolean isOnlyWires() {
+		return only_wires;
 	}
 
 	public boolean isHandPlacer() {
-		return hand_placer;
+		return hand_placer || head.isHandPlacer();
+	}
+
+	public void setDCP(File new_dcp) {
+		dcp = new_dcp;
 	}
 
 	/**
@@ -80,6 +96,10 @@ public class Directive {
 	 */
 	public Directive(Element elem, DirectiveHeader head) {
 		this.head = head;
+		
+		if (elem == null)
+			return;
+
 		// determine what 'type' of inst
 		// <inst type="value">
 		String inst_type_str = elem.getAttribute(INST.type.key);
@@ -88,19 +108,27 @@ public class Directive {
 			MessageGenerator.briefErrorAndExit(
 					"'type = \"" + inst_type_str + "\"' is not a valid attribute for 'inst'.\nExiting.");
 
-		// file must exist if not tagged write (ie is an output file)
-		dcp = getDCPFile(elem, head.fsys(), type != INST.TYPE.TypeEnum.WRITE);
 		pblock_str = getFirst(elem, INST.pblock);
 		inst_name = getFirst(elem, INST.inst_name);
 		force = getFirstBool(elem, INST.force);
 		hand_placer = getFirstBool(elem, INST.hand_placer);
 		refresh = getFirstBool(elem, INST.refresh);
+		only_wires = getFirstBool(elem, INST.only_wires);
+		// file must exist if it a merge and not an only wires cell
+		boolean err_if_not_found = !only_wires && (type == INST.TYPE.TypeEnum.MERGE);
+		dcp = getFirstFile(elem, INST.dcp, head.fsys(), err_if_not_found);
+
+		if (type == INST.TYPE.TypeEnum.BUILD) {
+			sub_builder = new DirectiveBuilder();
+			sub_builder.parse(elem, head.isVerbose(), head);
+		}
 	}
 
 	static String getFirst(Element elem, TAG t) {
 		String str = null;
 		try {
-			str = elem.getElementsByTagName(t.key).item(0).getTextContent();
+			// str = elem.getElementsByTagName(t.key).item(0).getTextContent();
+			str = XMLParser.getChildElementsFromTagName(elem, t.key).peek().getTextContent();
 		} catch (NullPointerException e) {
 			str = null;
 		}
@@ -108,7 +136,8 @@ public class Directive {
 	}
 
 	static boolean getFirstBool(Element elem, TAG t) {
-		return (elem.getElementsByTagName(t.key).item(0) != null);
+		// return (elem.getElementsByTagName(t.key).item(0) != null);
+		return (XMLParser.getChildElementsFromTagName(elem, t.key).peek() != null);
 	}
 
 	// static int getFirstInt(Element elem, TAG t) {
@@ -122,18 +151,18 @@ public class Directive {
 	// return num;
 	// }
 
-	static File getDCPFile(Element elem, FileSys fsys, boolean err_if_not_found) {
-		String filename = getFirst(elem, INST.dcp);
-		BaseEnum attr = getFirstAttr(elem, INST.dcp, INST.DCP.loc);
+	static File getFirstFile(Element elem, TAG t, FileSys fsys, boolean err_if_not_found) {
+		String filename = getFirst(elem, t);
+		BaseEnum attr = getFirstAttr(elem, t, FILE.loc);
 		if (attr != null) {
-			if (attr == INST.DCP.LOC.LocEnum.III)
+			if (attr == FILE.LOC.LocEnum.III)
 				filename = FileSys.FILE_ROOT.III.subsumePath(filename);
-			else if (attr == INST.DCP.LOC.LocEnum.OOC)
+			else if (attr == FILE.LOC.LocEnum.OOC)
 				filename = FileSys.FILE_ROOT.OOC.subsumePath(filename);
-			else if (attr == INST.DCP.LOC.LocEnum.OUT)
+			else if (attr == FILE.LOC.LocEnum.OUT)
 				filename = FileSys.FILE_ROOT.OUT.subsumePath(filename);
 			else
-				MessageGenerator.briefErrorAndExit("Unrecognized " + INST.DCP.loc.key + " '" + attr + "'.");
+				MessageGenerator.briefErrorAndExit("Unrecognized " + FILE.loc.key + " '" + attr + "'.");
 		}
 		if (err_if_not_found)
 			return fsys.getExistingFile(filename, err_if_not_found);
@@ -153,17 +182,19 @@ public class Directive {
 		if (k == null)
 			return null;
 		try {
-			Node node = elem.getElementsByTagName(t.key).item(0);
-			if (node.getNodeType() == Node.ELEMENT_NODE) {
-				Element elem2 = (Element) node;
-				return k.valueOf(elem2.getAttribute(k.key));
-			}
+			// Node node = elem.getElementsByTagName(t.key).item(0);
+			// if (node.getNodeType() == Node.ELEMENT_NODE) {
+			// Element elem2 = (Element) node;
+			// return k.valueOf(elem2.getAttribute(k.key));
+			// }
+			Element elem2 = XMLParser.getChildElementsFromTagName(elem, t.key).peek();
+			return k.valueOf(elem2.getAttribute(k.key));
 		} catch (NullPointerException e) {
 		}
 		return null;
 	}
 
-	static abstract class TAG {
+	static class TAG {
 		final String key;
 		private final List<TAG> children;
 		private final List<KEY> attributes;
@@ -223,110 +254,55 @@ public class Directive {
 		}
 	}
 
+	static class FILE extends TAG {
+		static class LOC extends KEY {
+			enum LocEnum implements BaseEnum {
+				III("iii"), OOC("ooc"), OUT("out");
+				final String tag_str;
+
+				LocEnum(String tag_str) {
+					this.tag_str = tag_str;
+				}
+
+				@Override
+				public String getStr() {
+					return tag_str;
+				}
+			}
+
+			LOC() {
+				super("loc", new HashSet<>(Arrays.asList(LocEnum.III, LocEnum.OOC, LocEnum.OUT)));
+			}
+		}
+
+		static final LOC loc = new LOC();
+
+		FILE(String tag) {
+			super(tag, Arrays.asList(), Arrays.asList(loc));
+		}
+	}
+
 	static class HEADER extends TAG {
-		static class III_DIR extends TAG {
-			III_DIR() {
-				super("iii_dir");
-			}
-		}
-
-		static class OOC_DIR extends TAG {
-			OOC_DIR() {
-				super("ooc_dir");
-			}
-		}
-
-		static class OUT_DIR extends TAG {
-			OUT_DIR() {
-				super("out_dir");
-			}
-		}
-
-		static class NAME extends TAG {
-			NAME() {
-				super("name");
-			}
-		}
-
-		static class REFRESH extends TAG {
-			REFRESH() {
-				super("refresh");
-			}
-		}
-
-		static final III_DIR iii_dir = new III_DIR();
-		static final OOC_DIR ooc_dir = new OOC_DIR();
-		static final OUT_DIR out_dir = new OUT_DIR();
-		static final NAME name = new NAME();
-		static final REFRESH refresh = new REFRESH();
+		static final TAG iii_dir = new TAG("iii_dir");
+		static final TAG ooc_dir = new TAG("ooc_dir");
+		static final TAG out_dir = new TAG("out_dir");
+		static final FILE initial = new FILE("initial");
+		static final FILE synth = new FILE("synth");
+		static final TAG name = new TAG("name");
+		static final TAG refresh = new TAG("refresh");
+		static final TAG hand_placer = new TAG("hand_placer");
+		static final TAG buffer_inputs = new TAG("buffer_inputs");
 
 		HEADER() {
-			super("header", Arrays.asList(iii_dir, ooc_dir, out_dir, name, refresh), Arrays.asList());
+			super("header", Arrays.asList(iii_dir, ooc_dir, out_dir, initial, synth, name, refresh, buffer_inputs),
+					Arrays.asList());
 		}
 	}
 
 	static class INST extends TAG {
-		static class DCP extends TAG {
-			static class LOC extends KEY {
-				enum LocEnum implements BaseEnum {
-					III("iii"), OOC("ooc"), OUT("out");
-					final String tag_str;
-
-					LocEnum(String tag_str) {
-						this.tag_str = tag_str;
-					}
-
-					@Override
-					public String getStr() {
-						return tag_str;
-					}
-				}
-
-				LOC() {
-					super("loc", new HashSet<>(Arrays.asList(LocEnum.III, LocEnum.OOC, LocEnum.OUT)));
-				}
-			}
-
-			static final LOC loc = new LOC();
-
-			DCP() {
-				super("dcp", Arrays.asList(), Arrays.asList(loc));
-			}
-		}
-
-		static class PBLOCK extends TAG {
-			PBLOCK() {
-				super("pblock");
-			}
-		}
-
-		static class INST_NAME extends TAG {
-			INST_NAME() {
-				super("name");
-			}
-		}
-
-		static class FORCE extends TAG {
-			FORCE() {
-				super("force");
-			}
-		}
-
-		static class HAND_PLACER extends TAG {
-			HAND_PLACER() {
-				super("hand_placer");
-			}
-		}
-
-		static class REFRESH extends TAG {
-			REFRESH() {
-				super("refresh");
-			}
-		}
-
 		static class TYPE extends KEY {
 			private enum TypeEnum implements BaseEnum {
-				MERGE("merge"), WRITE("write"), INIT("init");
+				MERGE("merge"), WRITE("write"), BUILD("build");
 				final String tag_str;
 
 				TypeEnum(String tag_str) {
@@ -340,20 +316,21 @@ public class Directive {
 			}
 
 			TYPE() {
-				super("type", new HashSet<>(Arrays.asList(TypeEnum.MERGE, TypeEnum.WRITE)));
+				super("type", new HashSet<>(Arrays.asList(TypeEnum.MERGE, TypeEnum.WRITE, TypeEnum.BUILD)));
 			}
 		}
 
-		static final DCP dcp = new DCP();
-		static final PBLOCK pblock = new PBLOCK();
-		static final INST_NAME inst_name = new INST_NAME();
+		static final FILE dcp = new FILE("dcp");
+		static final TAG pblock = new TAG("pblock");
+		static final TAG inst_name = new TAG("name");
+		static final TAG force = new TAG("force");
+		static final TAG hand_placer = new TAG("hand_placer");
+		static final TAG refresh = new TAG("refresh");
+		static final TAG only_wires = new TAG("only_wires");
 		static final TYPE type = new TYPE();
-		static final FORCE force = new FORCE();
-		static final HAND_PLACER hand_placer = new HAND_PLACER();
-		static final REFRESH refresh = new REFRESH();
 
 		INST() {
-			super("inst", new ArrayList<TAG>(Arrays.asList(dcp, pblock, force, hand_placer, refresh)),
+			super("inst", new ArrayList<TAG>(Arrays.asList(dcp, pblock, inst_name, force, hand_placer, refresh)),
 					new ArrayList<KEY>(Arrays.asList(type)));
 		}
 	}

@@ -57,29 +57,144 @@ public class FileSys {
 		if (root_dir == null)
 			MessageGenerator.briefErrorAndExit("Could not find directory '" + filename + "'");
 
+		setDirRoot(root, root_dir, false);
+	}
+
+	/**
+	 * Sets a root directory (iii, ooc or out).
+	 * 
+	 * @param root     Which directory to set root for.
+	 * @param root_dir File to set as root dir.
+	 */
+	public void setDirRoot(FILE_ROOT root, File root_dir) {
+		setDirRoot(root, root_dir, false);
+	}
+
+	/**
+	 * Sets a root directory (iii, ooc or out).
+	 * 
+	 * It has it's own verbose flag because the message is probably not very useful.
+	 * However it is included because it may help find problems with the root
+	 * directories not being what is expected.
+	 * 
+	 * @param root
+	 * @param root_dir
+	 * @param verbose  You probably want this to be false
+	 */
+	void setDirRoot(FILE_ROOT root, File root_dir, boolean verbose) {
+		if (!root_dir.isDirectory())
+			return;
+
 		switch (root) {
 		case III:
-			if (iii_dir != null)
+			if (verbose && iii_dir != null)
 				printIfVerbose("Moving 'iii' directory from '" + iii_dir.getAbsolutePath() + "'.");
 			iii_dir = root_dir;
-			printIfVerbose("'iii' directory is at '" + iii_dir.getAbsolutePath() + "'");
+			if (verbose)
+				printIfVerbose("'iii' directory is at '" + iii_dir.getAbsolutePath() + "'");
 			break;
 		case OOC:
-			if (ooc_dir != null)
+			if (verbose && ooc_dir != null)
 				printIfVerbose("Moving 'ooc' directory from '" + iii_dir.getAbsolutePath() + "'.");
 			ooc_dir = root_dir;
-			printIfVerbose("'ooc' directory is at '" + ooc_dir.getAbsolutePath() + "'");
+			if (verbose)
+				printIfVerbose("'ooc' directory is at '" + ooc_dir.getAbsolutePath() + "'");
 			break;
 		case OUT:
-			if (out_dir != null)
+			if (verbose && out_dir != null)
 				printIfVerbose("Moving 'out' directory from '" + iii_dir.getAbsolutePath() + "'.");
 			out_dir = root_dir;
-			printIfVerbose("'out' directory is at '" + out_dir.getAbsolutePath() + "'");
+			if (verbose)
+				printIfVerbose("'out' directory is at '" + out_dir.getAbsolutePath() + "'");
 			break;
 		default:
 			return;
 		}
-		printIfVerbose(""); // line break
+		if (verbose)
+			printIfVerbose(""); // line break
+	}
+
+	public File getRoot(FILE_ROOT root) {
+		switch (root) {
+		case III:
+			return iii_dir;
+		case OOC:
+			return ooc_dir;
+		case OUT:
+			return out_dir;
+		case PWD:
+		default:
+			return pwd_dir;
+		}
+	}
+
+	public static enum FILE_ROOT {
+		PWD(""), ROOT("/"), HOME("~"), III("#iii/"), OOC("#ooc/"), OUT("#out/");
+		String escape_seq = null;
+
+		FILE_ROOT(String seq) {
+			escape_seq = seq;
+		}
+
+		String escapeSeq() {
+			return escape_seq;
+		}
+
+		static FILE_ROOT which(String filename) {
+			if (filename == null)
+				MessageGenerator.briefErrorAndExit("\nCannot determine root of null filename.\nExiting.");
+			for (FILE_ROOT r : FILE_ROOT.values())
+				if (filename.startsWith(r.escape_seq) && (r != PWD))
+					return r;
+			return PWD;
+		}
+
+		public String subsumePath(String filename) {
+			return escape_seq + filename;
+		}
+	}
+
+	/**
+	 * Creates a file object from a filename. Uses escape sequence at beginning of
+	 * string if found.
+	 * 
+	 * @param filename Filename to create file object from.
+	 * @return File object representing file. May not actually exist in system.
+	 */
+	public File toFile(String filename) {
+		return toFile(filename, true);
+	}
+
+	public File toFile(String filename, boolean use_escapes) {
+		if (filename == null)
+			return null;
+
+		File f = null;
+		// filename starts with '/' or '~', assume it is a complete path.
+		if (filename.startsWith(FILE_ROOT.ROOT.escapeSeq()) || filename.startsWith(FILE_ROOT.HOME.escapeSeq()))
+			f = new File(filename);
+		else if (use_escapes && (iii_dir != null) && filename.startsWith(FILE_ROOT.III.escapeSeq())) {
+			if (iii_dir == null) {
+				printIfVerbose("\nCannot create file relative to iii, iii_dir is not defined.");
+				return null;
+			}
+			f = new File(iii_dir, filename.replaceFirst(FILE_ROOT.III.escapeSeq(), ""));
+		} else if (use_escapes && (ooc_dir != null) && filename.startsWith(FILE_ROOT.OOC.escapeSeq())) {
+			if (ooc_dir == null) {
+				printIfVerbose("\nCannot create file relative to ooc, ooc_dir is not defined.");
+				return null;
+			}
+			f = new File(ooc_dir, filename.replaceFirst(FILE_ROOT.OOC.escapeSeq(), ""));
+		} else if (use_escapes && (out_dir != null) && filename.startsWith(FILE_ROOT.OUT.escapeSeq())) {
+			if (out_dir == null) {
+				printIfVerbose("\nCannot create file relative to out, out_dir is not defined.");
+				return null;
+			}
+			f = new File(out_dir, filename.replaceFirst(FILE_ROOT.OUT.escapeSeq(), ""));
+		} else // assume filename relative to pwd
+			f = new File(pwd_dir, filename);
+
+		return f;
 	}
 
 	public File getExistingFile(String filename, boolean error_if_not_found) {
@@ -151,88 +266,5 @@ public class FileSys {
 			}
 		}
 		return f;
-	}
-
-	static enum FILE_ROOT {
-		PWD(""), ROOT("/"), HOME("~"), III("#iii/"), OOC("#ooc/"), OUT("#out/");
-		String escape_seq = null;
-
-		FILE_ROOT(String seq) {
-			escape_seq = seq;
-		}
-
-		String escapeSeq() {
-			return escape_seq;
-		}
-
-		static FILE_ROOT which(String filename) {
-			if (filename == null)
-				MessageGenerator.briefErrorAndExit("\nCannot determine root of null filename.\nExiting.");
-			for (FILE_ROOT r : FILE_ROOT.values())
-				if (filename.startsWith(r.escape_seq) && (r != PWD))
-					return r;
-			return PWD;
-		}
-
-		public String subsumePath(String filename) {
-			return escape_seq + filename;
-		}
-	}
-
-	/**
-	 * Creates a file object from a filename. Uses escape sequence at beginning of
-	 * string if found.
-	 * 
-	 * @param filename Filename to create file object from.
-	 * @return File object representing file. May not actually exist in system.
-	 */
-	File toFile(String filename) {
-		return toFile(filename, true);
-	}
-
-	File toFile(String filename, boolean use_escapes) {
-		if (filename == null)
-			return null;
-
-		File f = null;
-		// filename starts with '/' or '~', assume it is a complete path.
-		if (filename.startsWith(FILE_ROOT.ROOT.escapeSeq()) || filename.startsWith(FILE_ROOT.HOME.escapeSeq()))
-			f = new File(filename);
-		else if (use_escapes && (iii_dir != null) && filename.startsWith(FILE_ROOT.III.escapeSeq())) {
-			if (iii_dir == null) {
-				printIfVerbose("\nCannot create file relative to iii, iii_dir is not defined.");
-				return null;
-			}
-			f = new File(iii_dir, filename.replaceFirst(FILE_ROOT.III.escapeSeq(), ""));
-		} else if (use_escapes && (ooc_dir != null) && filename.startsWith(FILE_ROOT.OOC.escapeSeq())) {
-			if (ooc_dir == null) {
-				printIfVerbose("\nCannot create file relative to ooc, ooc_dir is not defined.");
-				return null;
-			}
-			f = new File(ooc_dir, filename.replaceFirst(FILE_ROOT.OOC.escapeSeq(), ""));
-		} else if (use_escapes && (out_dir != null) && filename.startsWith(FILE_ROOT.OUT.escapeSeq())) {
-			if (out_dir == null) {
-				printIfVerbose("\nCannot create file relative to out, out_dir is not defined.");
-				return null;
-			}
-			f = new File(out_dir, filename.replaceFirst(FILE_ROOT.OUT.escapeSeq(), ""));
-		} else // assume filename relative to pwd
-			f = new File(pwd_dir, filename);
-
-		return f;
-	}
-
-	public File getRoot(FILE_ROOT root) {
-		switch (root) {
-		case III:
-			return iii_dir;
-		case OOC:
-			return ooc_dir;
-		case OUT:
-			return out_dir;
-		case PWD:
-		default:
-			return pwd_dir;
-		}
 	}
 }

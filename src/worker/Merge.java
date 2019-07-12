@@ -9,6 +9,7 @@ import com.xilinx.rapidwright.design.*;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.*;
 
+import directive.Directive;
 import parser.ArgsContainer;
 import tcl.TCLEnum;
 import tcl.TCLScript;
@@ -75,7 +76,7 @@ public class Merge {
 		design.getNetlist().renameNetlistAndTopCell(design.getName());
 		// Merge merge = new Merge(design);
 		// merge.unconnected_ports.addAll(design.getNetlist().getTopCell().getPorts());
-		// // TODO instead connect to approx where ports will actually be going.
+		// // todo instead connect to approx where ports will actually be going.
 		// merge.connectPortsToGround();
 
 		String output_dcp = directive.getIII().getAbsolutePath() + "/" + design.getName() + ".dcp";
@@ -93,7 +94,7 @@ public class Merge {
 		script.addCustomCmd("resize_pblock -add " + directive.getPBlockStr() + " [get_pblocks " + pblock_name + "]");
 		script.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells]");
 		script.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
-		// TODO opt?
+		// todo opt?
 		// script.add(TCLEnum.OPT);
 		script.add(TCLEnum.PLACE);
 		script.add(TCLEnum.ROUTE);
@@ -165,7 +166,7 @@ public class Merge {
 	}
 
 	public void connect(Connections conn) {
-		// TODO implement connect(connections)
+		// todo implement connect(connections)
 		connectPortsToGround(); // tmp
 
 	}
@@ -214,9 +215,6 @@ public class Merge {
 					port_i2.getNet().removePortInst(port_i2);
 				net.createPortInst(port2, ci2);
 			}
-
-			int tmp = 0;
-			tmp += 9;
 		}
 	}
 

@@ -1,9 +1,6 @@
 
 package worker;
 
-import java.io.File;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -11,12 +8,13 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.edif.EDIFCell;
-import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 
 import util.DesignUtils;
 import worker.MyPort;
+import directive.DirectiveBuilder;
+import directive.Directive;
 
 public class Connections {
 
