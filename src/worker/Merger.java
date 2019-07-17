@@ -43,6 +43,8 @@ public class Merger {
 	private Set<String> wire_cells = new HashSet<>();
 	private File final_dcp = null;
 
+	public static final String MODULE_CACHE = "moduleCache";
+
 	public Merger() {
 	}
 
@@ -68,10 +70,10 @@ public class Merger {
 		if (synth_top == null)
 			return;
 
-		for (EDIFCellInst synth_inst : synth_top.getCellInsts()){
+		for (EDIFCellInst synth_inst : synth_top.getCellInsts()) {
 			EDIFCell synth_cell = synth_inst.getCellType();
 			design.getNetlist().migrateCellAndSubCells(synth_cell);
-			if(synth_cell.isPrimitive())
+			if (synth_cell.isPrimitive())
 				new EDIFCellInst(synth_inst.getName(), synth_cell, top);
 		}
 
@@ -89,10 +91,24 @@ public class Merger {
 	 * @param args      Command line args.
 	 */
 	public void merge(Directive directive, ArgsContainer args) {
+		// String module_name = getModuleName(directive, args);
+		// if (module_name == null)
+		// MessageGenerator.briefErrorAndExit("Null module name");
+		// String pblock = directive.getPBlockStr();
+		// if (pblock == null)
+		// MessageGenerator.briefErrorAndExit("No pblock specified for '" + module_name
+		// + "'.");
+		// // create cache folder in iii
+		// File cache_impl_dir = new File(directive.getIII(),
+		// MODULE_CACHE + "/" + module_name + "/" + pblock.replace(' ', '+'));
+		// if (!cache_impl_dir.isDirectory())
+		// cache_impl_dir.mkdirs();
+		// DependancyMeta.writeMeta(cache_impl_dir, directive, args);
+
 		Module mod = fetchAndPrepModule(directive, args);
 		if (design == null) {
-			if (directive.getHeader().getName() != null)
-				init(new Design(directive.getHeader().getName(), mod.getDevice().getDeviceName()),
+			if (directive.getHeader().getModuleName() != null)
+				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
 						directive.getHeader(), args);
 			else
 				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
@@ -126,29 +142,36 @@ public class Merger {
 			MessageGenerator.briefErrorAndExit("\nCould not find dcp '" + directive.getDCP().getAbsolutePath()
 					+ "' specified in merge directive.\nExiting.");
 
-		File cache_dir = new File(directive.getIII(), "moduleCache");
-		File cached_dcp = new File(cache_dir, directive.getDCP().getName());
 		boolean was_already_cached = false;
 		String cached_dcp_str = null;
 
-		if (!directive.isRefresh() && cache_dir.isDirectory()
-				&& FileTools.isFileNewer(cached_dcp.getAbsolutePath(), directive.getDCP().getAbsolutePath())) {
-			// cached dcp exists and is newer than directive dcp
-			String mod_name = FileTools.removeFileExtension(directive.getDCP().getName());
-			mod = (design == null) ? null : design.getModule(mod_name);
-			if (mod != null) {
-				printIfVerbose("\nReusing already loaded module '" + mod_name + "'", verbose);
-				return mod;
-			} else {
-				printIfVerbose("\nUsing cached module from '" + cached_dcp.getAbsolutePath() + "'.", verbose);
-				was_already_cached = true;
+		// Try to find in cache. If is in the cache and is newer than all it's
+		// dependancies, then use it.
+		if (!directive.isRefresh()) {
+			File cached_dcp = findModuleInCache(directive, args);
+			if (cached_dcp != null) {
+				// TODO reuse module if already loaded?
+				// how to know if same implementation of module?
+
+				// mod = (design == null) ? null : design.getModule(mod_name);
+				// if (mod != null) {
+				// printIfVerbose("\nReusing already loaded module '" + mod_name + "'",
+				// verbose);
+				// return mod;
+				// }
+
 				cached_dcp_str = cached_dcp.getAbsolutePath();
+				was_already_cached = true;
 			}
-		} else {
-			// Place and route from dcp
+		}
+
+		// if didn't find in cache or refresh requested then place and route from dcp.
+		if (cached_dcp_str == null) {
 			printIfVerbose("\nPlacing and routing '" + directive.getDCP().getAbsolutePath() + "'", verbose);
 			cached_dcp_str = placeRouteOOC(directive, args);
 		}
+		if (cached_dcp_str == null)
+			MessageGenerator.briefErrorAndExit("Failed to find design to load.");
 
 		Design d = DesignUtils.safeReadCheckpoint(cached_dcp_str, verbose, directive.getIII());
 		d.getNetlist().getTopCellInst();
@@ -160,8 +183,8 @@ public class Merger {
 		// TODO pblock string may be null
 		mod.setPBlock(directive.getPBlockStr());
 		if (design == null) {
-			if (directive.getHeader().getName() != null)
-				init(new Design(directive.getHeader().getName(), mod.getDevice().getDeviceName()),
+			if (directive.getHeader().getModuleName() != null)
+				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
 						directive.getHeader(), args);
 			else
 				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
@@ -179,6 +202,121 @@ public class Merger {
 		return mod;
 	}
 
+	public static File findModuleInCache(Directive directive, ArgsContainer args) {
+		return findModuleInCache(directive, args, new DependancyMeta.DepSet());
+	}
+
+	public static File findModuleInCache(Directive directive, ArgsContainer args, DependancyMeta.DepSet visited) {
+		File cache_dir = new File(directive.getIII(), MODULE_CACHE);
+		if (!cache_dir.isDirectory()) {
+			printIfVerbose("\nCache directory was not found at '" + cache_dir.getAbsolutePath() + "'.", args.verbose());
+			return null;
+		}
+
+		String module_name = getModuleName(directive, args);
+		if (module_name == null)
+			return null;
+
+		File mod_dir = new File(cache_dir, module_name);
+		if (!mod_dir.isDirectory()) {
+			printIfVerbose("\nCan't find module '" + module_name + "' in cache.", args.verbose());
+			return null;
+		}
+		String pblock = directive.getPBlockStr();
+		File impl_dir;
+		if (pblock != null) {
+			impl_dir = new File(mod_dir, pblock.replace(' ', '+'));
+		} else {
+			printIfVerbose("\nNo pblock specified for module '" + module_name + "'.", args.verbose());
+			impl_dir = mod_dir;
+		}
+
+		if (!impl_dir.isDirectory()) {
+			printIfVerbose("\nCan't find module '" + module_name + "' in cache.", args.verbose());
+			return null;
+		}
+		File cached_dcp = new File(impl_dir, module_name + ".dcp");
+		if (!cached_dcp.isFile()) {
+			printIfVerbose("\nCan't find module '" + module_name + "' in cache.", args.verbose());
+			return null;
+		}
+		if (!new File(impl_dir, DependancyMeta.META_FILENAME).isFile()) {
+			printIfVerbose("\nCan't find metadata for module '" + module_name + "' in cache.", args.verbose());
+			return null;
+		}
+
+		// TODO findModuleInCache() checks for build
+		// read metadata
+		File meta_file = new File(impl_dir, DependancyMeta.META_FILENAME);
+		DependancyMeta meta = new DependancyMeta(meta_file, args.verbose());
+		DependancyMeta.DepSet dep_set = meta.initDepSet();
+		DependancyMeta.DepSet dep_set2 = new DependancyMeta.DepSet(dep_set);
+
+		String s1 = directive.getHeader().getTopLevelSynth() == null ? ""
+				: directive.getHeader().getTopLevelSynth().getAbsolutePath();
+		String s2 = meta.getTopLevelSynth() == null ? "" : meta.getTopLevelSynth().getAbsolutePath();
+		if (!s1.equals(s2)) {
+			printIfVerbose(
+					"Synth file from build directives '" + directive.getHeader().getTopLevelSynth()
+							+ "' does not match synth file from dependancies '" + meta.getTopLevelSynth() + "'.",
+					args.verbose());
+			return null;
+		}
+		s1 = directive.getHeader().getInitial() == null ? "" : directive.getHeader().getInitial().getAbsolutePath();
+		s2 = meta.getInitial() == null ? "" : meta.getInitial().getAbsolutePath();
+		if (!s1.equals(s2)) {
+			printIfVerbose(
+					"Initial file from build directives '" + directive.getHeader().getInitial()
+							+ "' does not match initial file from dependancies '" + meta.getInitial() + "'.",
+					args.verbose());
+			return null;
+		}
+
+		// for each subbuilder directive
+		if (directive.isSubBuilder()) {
+			for (Directive dir : directive.getSubBuilder().getDirectives()) {
+				if (dir.isOnlyWires())
+					continue;
+				String sub_mod = getModuleName(dir, args);
+				String sub_pblock = (dir.getPBlockStr() == null) ? "" : dir.getPBlockStr();
+				if (visited.contains(sub_mod, sub_pblock))
+					continue;
+				visited.put(sub_mod, sub_pblock);
+
+				String sub_pblock_plus = sub_pblock.replace(" ", "+");
+				if (!dep_set.contains(sub_mod, sub_pblock_plus)) {
+					printIfVerbose("\nModule '" + sub_mod + "' with pblock '" + sub_pblock
+							+ "' was not found the dependancies of " + module_name + ".", args.verbose());
+					return null;
+				}
+				dep_set2.remove(sub_mod, sub_pblock_plus);
+
+				File sub = findModuleInCache(dir, args, visited);
+				if (sub == null)
+					return null;
+
+				if (!FileTools.isFileNewer(cached_dcp.getAbsolutePath(), sub.getAbsolutePath())) {
+					printIfVerbose("\nModule '" + module_name + "' is outdated.", args.verbose());
+					return null;
+				}
+			}
+		} else {
+			if (!FileTools.isFileNewer(cached_dcp.getAbsolutePath(), directive.getDCP().getAbsolutePath())) {
+				printIfVerbose("\nModule '" + module_name + "' is outdated.", args.verbose());
+				return null;
+			} else {
+				dep_set2.remove(getModuleName(directive, args), "");
+			}
+		}
+
+		if (!dep_set2.isEmpty()) {
+			printIfVerbose("Not all dependancies of " + module_name + " were specified", args.verbose());
+			return null;
+		}
+		printIfVerbose("Module '" + module_name + "' was found in cache.", args.verbose());
+		return cached_dcp;
+	}
+
 	/**
 	 * Places and routes the design out of context in the specified pblock.
 	 * 
@@ -187,24 +325,48 @@ public class Merger {
 	 * @return String where output was written.
 	 */
 	private static String placeRouteOOC(Directive directive, ArgsContainer args) {
-		// create cache folder in iii
-		File cache_dir = new File(directive.getIII(), "moduleCache");
-		if (!cache_dir.isDirectory())
-			cache_dir.mkdirs();
+		String module_name = getModuleName(directive, args);
+		if (module_name == null)
+			return null;
 
-		String pblock_name = "[get_property TOP [current_design ]]" + "_pblock";
+		if (directive.getPBlockStr() == null) {
+			// TODO may not have specified pblock for non base designs
+			// ? should pblock be forced to exist for base designs?
+			printIfVerbose("\nNo pblock specified for '" + module_name + "'.", args.verbose());
+			// return null;
+		}
+		File cache_impl_dir;
+		if (directive.getPBlockStr() == null)
+			cache_impl_dir = new File(directive.getIII(), MODULE_CACHE + "/" + module_name);
+		else
+			cache_impl_dir = new File(directive.getIII(),
+					MODULE_CACHE + "/" + module_name + "/" + directive.getPBlockStr().replace(' ', '+'));
+		// create cache folder in iii
+		// File cache_impl_dir = new File(directive.getIII(),
+		// MODULE_CACHE + "/" + module_name + "/" + directive.getPBlockStr().replace('
+		// ', '+'));
+		if (!cache_impl_dir.isDirectory())
+			cache_impl_dir.mkdirs();
+
+		// write metadata for cache
+		DependancyMeta.writeMeta(cache_impl_dir, directive, args);
+
 		String options = (args == null) ? "f" : args.options("f");
 		String input_dcp = directive.getDCP().getAbsolutePath();
-		String output_dcp = cache_dir.getAbsolutePath() + "/" + directive.getDCP().getName();
+		String output_dcp = cache_impl_dir.getAbsolutePath() + "/" + module_name + ".dcp";
 		String tcl_script_file = directive.getIII().getAbsolutePath() + "/pblock_place_route_step.tcl";
-
 		TCLScript script = new TCLScript(input_dcp, output_dcp, options, tcl_script_file);
-		script.addCustomCmd("create_pblock " + pblock_name);
-		script.addCustomCmd("resize_pblock -add {" + directive.getPBlockStr() + "} [get_pblocks " + pblock_name + "]");
-		script.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells]");
-		script.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
-		script.addCustomCmd("set_property SNAPPING_MODE ROUTING [get_pblocks " + pblock_name + "]");
-		// todo opt?
+
+		if (directive.getPBlockStr() != null) {
+			String pblock_name = "[get_property TOP [current_design ]]" + "_pblock";
+			script.addCustomCmd("create_pblock " + pblock_name);
+			script.addCustomCmd(
+					"resize_pblock -add {" + directive.getPBlockStr() + "} [get_pblocks " + pblock_name + "]");
+			script.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells]");
+			script.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
+			script.addCustomCmd("set_property SNAPPING_MODE ROUTING [get_pblocks " + pblock_name + "]");
+		}
+		// TODO opt?
 		// script.add(TCLEnum.OPT);
 		script.add(TCLEnum.PLACE);
 		script.add(TCLEnum.ROUTE);
@@ -213,6 +375,27 @@ public class Merger {
 		script.run();
 
 		return output_dcp;
+	}
+
+	private static String getModuleName(Directive directive, ArgsContainer args) {
+		String module_name = null;
+		if (directive.isSubBuilder())
+			module_name = directive.getSubBuilder().getHeader().getModuleName();
+
+		if (module_name == null) {
+			if (directive.getDCP() == null) {
+				if (directive.getInstName() == null)
+					printIfVerbose(
+							"Can't find module in cache. Neither dcp nor module_name are specified. No instance name given either.",
+							args.verbose());
+				else
+					printIfVerbose("Can't find module in cache for module instance '" + directive.getInstName()
+							+ "'. Neither dcp nor module_name are specified.", args.verbose());
+				return null;
+			}
+			module_name = FileTools.removeFileExtension(directive.getDCP().getName());
+		}
+		return module_name;
 	}
 
 	/**
@@ -364,13 +547,91 @@ public class Merger {
 		script.run();
 	}
 
+	private static void printIfVerbose(String msg, boolean verbose) {
+		if (verbose)
+			MessageGenerator.briefMessage(msg);
+	}
+
+	public void setFinalDCP(File out_dcp) {
+		final_dcp = out_dcp;
+	}
+
+	public File getFinalDCP() {
+		return final_dcp;
+	}
+
+	public void writeCheckpoint(File dcp_file) {
+		dcp_file.getParentFile().mkdirs();
+		if (design != null)
+			design.writeCheckpoint(dcp_file.getAbsolutePath());
+	}
+
+	public void writeCheckpoint(String filename) {
+		if (filename != null)
+			writeCheckpoint(new File(filename));
+	}
+
+	public static void lockPlacement(Design d) {
+		for (Cell c : d.getCells()) {
+			c.setBELFixed(true);
+			c.setSiteFixed(true);
+		}
+	}
+
+	public static void lockRouting(Design d) {
+		for (Net n : d.getNets()) {
+			for (PIP p : n.getPIPs()) {
+				p.setIsPIPFixed(true);
+			}
+		}
+	}
+
 	/**
+	 * Modified from EDIFNetlist.migrate_cellAndSubCells()
+	 * 
+	 * This should do the same except that it replaces blackboxes.
+	 * 
+	 * @param cell Cell to merge (along with its subcells) into design.getNetlist().
+	 */
+	private void myMigrateCellAndSubCells(EDIFCell cell) {
+		EDIFNetlist netlist = design.getNetlist();
+		Queue<EDIFCell> cells = new LinkedList<>();
+		cells.add(cell);
+		while (!cells.isEmpty()) {
+			EDIFCell curr = cells.poll();
+			EDIFLibrary destLib = netlist.getLibrary(curr.getLibrary().getName());
+			if (destLib == null) {
+				if (curr.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
+					destLib = netlist.getHDIPrimitivesLibrary();
+				} else {
+					destLib = netlist.getWorkLibrary();
+				}
+			}
+
+			if (!destLib.containsCell(curr)) {
+				destLib.addCell(curr);
+			} else if (curr.hasContents()) {
+				destLib.removeCell(curr.getName());
+				destLib.addCell(curr);
+			}
+
+			for (EDIFCellInst inst : curr.getCellInsts()) {
+				cells.add(inst.getCellType());
+			}
+		}
+	}
+
+	/**
+	 * DEPRICATED
+	 * 
 	 * Makes as many connections as it can find between this module instance and the
 	 * rest of the design.
 	 * 
 	 * @param mi    Module instance to make connections to/from.
 	 * @param conns Possible connections to make.
 	 */
+	@Deprecated
+	@SuppressWarnings("unused")
 	private void connectAll(ModuleInst mi, Connections conns) {
 		// TODO fix connectAll()
 		// ! either rearrange Connections to search by module inst or loop through every
@@ -384,8 +645,7 @@ public class Merger {
 		if (top.getNet(CLK) == null) {
 			// Create clk and rst
 			design.setAutoIOBuffers(false);
-			// TODO figure out how to set IO buffers for all but clk (if top module not
-			// adding to synth_1)
+
 			EDIFNet clk = top.addNet(new EDIFNet(CLK, top));
 			clk.createPortInst(top.createPort(CLK, EDIFDirection.INPUT, 1));
 			top.createPort(RST, EDIFDirection.INPUT, 1);
@@ -439,6 +699,8 @@ public class Merger {
 	}
 
 	/**
+	 * DEPRICATED
+	 * 
 	 * Connects two ports (single bit or bus). Adds port instances and nets as
 	 * needed. If both have port instances on different nets, moves sink_port
 	 * instance to source port net.
@@ -447,6 +709,8 @@ public class Merger {
 	 * differently alligned bus indicies, connects those indicies that overlap. Ex
 	 * port1[6:0] port2[4:3] connects 4:3. Ex port1[5:2] port2[4:0] connects 4:2.
 	 */
+	@Deprecated
+	@SuppressWarnings("unused")
 	private void edifConnect(EDIFCell parent, EDIFCellInst source_ci, EDIFPort source_port, EDIFCellInst sink_ci,
 			EDIFPort sink_port) {
 		if (source_port.isBus() && sink_port.isBus()) {
@@ -466,10 +730,14 @@ public class Merger {
 	}
 
 	/**
+	 * DEPRICATED
+	 * 
 	 * Connects two single bit ports/one bit on bus. Adds port instances and nets as
 	 * needed. If both have port instances on different nets, moves sink_port
 	 * instance to source port net.
 	 */
+	@Deprecated
+	@SuppressWarnings("unused")
 	private void edifConnect(EDIFCell parent, EDIFCellInst source_ci, EDIFPort source_port, String source_pi_name,
 			EDIFCellInst sink_ci, EDIFPort sink_port, String sink_pi_name) {
 
@@ -493,75 +761,4 @@ public class Merger {
 		// else already connected to same net
 	}
 
-	private static void printIfVerbose(String msg, boolean verbose) {
-		if (verbose)
-			MessageGenerator.briefMessage(msg);
-	}
-
-	public void setFinalDCP(File out_dcp) {
-		final_dcp = out_dcp;
-	}
-
-	public File getFinalDCP() {
-		return final_dcp;
-	}
-
-	public void writeCheckpoint(File dcp_file) {
-		writeCheckpoint(dcp_file.getAbsolutePath());
-	}
-
-	public void writeCheckpoint(String filename) {
-		if (design != null)
-			design.writeCheckpoint(filename);
-	}
-
-	public static void lockPlacement(Design d) {
-		for (Cell c : d.getCells()) {
-			c.setBELFixed(true);
-			c.setSiteFixed(true);
-		}
-	}
-
-	public static void lockRouting(Design d) {
-		for (Net n : d.getNets()) {
-			for (PIP p : n.getPIPs()) {
-				p.setIsPIPFixed(true);
-			}
-		}
-	}
-
-	/**
-	 * Modified from EDIFNetlist.migrate_cellAndSubCells()
-	 * 
-	 * This should do the same except that it replaces blackboxes.
-	 * 
-	 * @param cell Cell to merge (along with its subcells) into design.getNetlist().
-	 */
-	private void myMigrateCellAndSubCells(EDIFCell cell) {
-		EDIFNetlist netlist = design.getNetlist();
-		Queue<EDIFCell> cells = new LinkedList<>();
-		cells.add(cell);
-		while (!cells.isEmpty()) {
-			EDIFCell curr = cells.poll();
-			EDIFLibrary destLib = netlist.getLibrary(curr.getLibrary().getName());
-			if (destLib == null) {
-				if (curr.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME)) {
-					destLib = netlist.getHDIPrimitivesLibrary();
-				} else {
-					destLib = netlist.getWorkLibrary();
-				}
-			}
-
-			if (!destLib.containsCell(curr)) {
-				destLib.addCell(curr);
-			} else if (curr.hasContents()) {
-				destLib.removeCell(curr.getName());
-				destLib.addCell(curr);
-			}
-
-			for (EDIFCellInst inst : curr.getCellInsts()) {
-				cells.add(inst.getCellType());
-			}
-		}
-	}
 }

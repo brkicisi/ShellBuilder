@@ -3,6 +3,11 @@ package top;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.util.MessageGenerator;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+
 import parser.Args;
 import parser.ArgsContainer;
 import util.DesignUtils;
@@ -11,6 +16,7 @@ import directive.*;
 import worker.FileSys;
 
 import java.io.File;
+import java.io.IOException;
 
 public class ShellBuilder {
 
@@ -58,8 +64,13 @@ public class ShellBuilder {
 	private void runDirective(Directive directive, Merger merger) {
 		if (directive.isSubBuilder()) {
 			// TODO check for cached hierarchial solutions
-			Merger sub_merge = runBuilder(directive.getSubBuilder());
-			directive.setDCP(sub_merge.getFinalDCP());
+			File cached_dcp = Merger.findModuleInCache(directive, args);
+			if (cached_dcp != null) {
+				directive.setDCP(cached_dcp);
+			} else {
+				Merger sub_merge = runBuilder(directive.getSubBuilder());
+				directive.setDCP(sub_merge.getFinalDCP());
+			}
 			merger.merge(directive, args);
 
 		} else if (directive.isMerge()) {
@@ -75,10 +86,9 @@ public class ShellBuilder {
 			String output_dcp = directive.getDCP().getAbsolutePath();
 			printIfVerbose("Output dcp to '" + output_dcp + "'");
 			merger.writeCheckpoint(output_dcp);
-
 		} else {
 			MessageGenerator
-					.briefErrorAndExit("Unrecognized directive '" + directive.getType().getStr() + "'.\nExiting.");
+					.briefErrorAndExit("Unrecognized directive '" + directive.getType().toString() + "'.\nExiting.");
 		}
 	}
 
@@ -92,52 +102,81 @@ public class ShellBuilder {
 			Design d = DesignUtils.safeReadCheckpoint(initial, args.verbose(), head.getIII());
 			merger = new Merger(d, head, args);
 		} else {
-			String name = directive_builder.getHeader().getName();
-			if (name == null)
-				name = "top";
-			printIfVerbose("Initializing initial merger base design with name '" + name + "'.");
+			String module_name = directive_builder.getHeader().getModuleName();
+			if (module_name == null)
+				module_name = "top";
+			printIfVerbose("Initializing initial merger base design with module name '" + module_name + "'.");
 			merger = new Merger();
 		}
 		// this currently just executes everything
-		// it checks for cached designs, but doesn't check for cached partial hierarchial designs
+		// it checks for cached designs, but doesn't check for cached partial
+		// hierarchial designs
 		for (Directive step : directive_builder.getDirectives())
 			runDirective(step, merger);
 
-		// Get dcp of last directive if it was a write
-		File out_dcp = null;
-		for (Directive directive : directive_builder.getDirectives()) {
-			if (directive.isWrite())
-				out_dcp = directive.getDCP();
-			else
-				out_dcp = null;
-		}
-		if (out_dcp == null) {
-			File iii_dir = (head.getParent() == null) ? head.getIII() : head.getParent().getIII();
-			out_dcp = new File(iii_dir, "moduleCache/" + head.getName() + ".dcp");
-		}
+		File iii_dir = (head.getParent() == null) ? head.getIII() : head.getParent().getIII();
+		if (head.getModuleName() == null)
+			MessageGenerator.briefErrorAndExit("No name specified for module being built.");
+
+		File out_dcp = new File(iii_dir,
+				Merger.MODULE_CACHE + "/" + head.getModuleName() + "/" + head.getModuleName() + ".dcp");
 		merger.setFinalDCP(out_dcp);
 		merger.writeCheckpoint(out_dcp);
 		merger.placeAndRoute(out_dcp, directive_builder.getHeader(), args);
 
-		// TODO insert this design to initial design if supplied
-		if (head.getInitial() != null) {
-			// Design wrapper = DesignUtils.safeReadCheckpoint(head.getInitial(), args.verbose(), head.getIII());
-			// Merger merger2 = new Merger(wrapper, head, args);
-			// Directive directive2 = new Directive(elem, head);
-			// merger2.merge(directive2, args);
+		// Get dcp of last directive if it was a write
+		File write_dcp = null;
+		for (Directive directive : directive_builder.getDirectives()) {
+			if (directive.isWrite())
+				write_dcp = directive.getDCP();
+			else
+				write_dcp = null;
+		}
+		if (write_dcp != null) {
+			// if last directive was a write, write placed and routed module to this final
+			// write location.
+			try {
+				Path from = Paths.get(out_dcp.getAbsolutePath());
+				Path to = Paths.get(write_dcp.getAbsolutePath());
+				Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
+
+				File f = new File(out_dcp.getParentFile(), out_dcp.getName().replace(".dcp", ".edf"));
+				from = Paths.get(f.getAbsolutePath());
+				f = new File(write_dcp.getParentFile(), write_dcp.getName().replace(".dcp", ".edf"));
+				to = Paths.get(f.getAbsolutePath());
+				Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
+
+				// Files.copy(out_dcp, write_dcp);
+				// Files.copy(new File(out_dcp.getParentFile(),
+				// out_dcp.getName().replace(".dcp", ".edf")),
+				// new File(write_dcp.getParentFile(), write_dcp.getName().replace(".dcp",
+				// ".edf")));
+			} catch (IOException ioe) {
+				printIfVerbose("Failed to copy checkpoint and edif from cache to '" + write_dcp.getParent() + "'");
+			}
 		}
 
 		return merger;
 	}
 
+	public void runTemplateBuilder(DirectiveBuilder directive_builder) {
+		for (DirectiveWriter.TemplateBuilder template_builder : directive_builder.getTemplateBuilders())
+			template_builder.writeTemplate();
+		for (Directive dir : directive_builder.getDirectives())
+			if (dir.isSubBuilder())
+				runTemplateBuilder(dir.getSubBuilder());
+	}
+
 	public void start(String[] cmd_line_args) {
 		args = new ArgsContainer(cmd_line_args);
+		FileSys fsys = new FileSys(args.verbose());
+		File xml_directives = fsys.getExistingFile(args.getOneArg(Args.Tag.XML_DIRECTIVES), true);
 
-		File xml_directives = new FileSys(args.verbose()).getExistingFile(args.getOneArg(Args.Tag.XML_DIRECTIVES),
-				true);
 		DirectiveBuilder directive_builder = new DirectiveBuilder();
 		directive_builder.parse(xml_directives, args.verbose());
-		runBuilder(directive_builder);
+		runTemplateBuilder(directive_builder);
+		if (!directive_builder.getDirectives().isEmpty())
+			runBuilder(directive_builder);
 
 		MessageGenerator.briefMessage("\nFinished.");
 	}

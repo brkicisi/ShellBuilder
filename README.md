@@ -116,10 +116,10 @@ The exception to the above rule is `<inst>` which will be repeated many times (o
   	</tr>
 	<tr>
 		<td>1.5</td>
-    	<td>name</td>
+    	<td>module_name</td>
 		<td></td>
 		<td></td>
-		<td>Sets name to this if initializing a new design. Cannot contain spaces. Has no effect if starting with a base design.</td>
+		<td>Sets name of module to this if initializing a new design. Cannot contain spaces (will be replaced with underscores). Has no effect if starting with a base design.</td>
   	</tr>
 	<tr>
 		<td>2</td>
@@ -144,7 +144,7 @@ The exception to the above rule is `<inst>` which will be repeated many times (o
   	</tr>
 	<tr>
 		<td>2.3</td>
-    	<td>name</td>
+    	<td>iname</td>
 		<td></td>
 		<td></td>
 		<td>Name to give this instance of the dcp module.</td>
@@ -196,7 +196,7 @@ You can insert comments basically anywhere just as in standard xml.
 <!-- This is an xml comment. -->
 ```
 
-Here is an example including all the tags ShellBuilder checks for.
+Here is an example.
 
 ```xml
 <!-- 

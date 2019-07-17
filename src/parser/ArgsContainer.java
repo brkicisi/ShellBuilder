@@ -7,30 +7,44 @@ import java.util.List;
 public class ArgsContainer {
 	private Map<String, List<String>> arg_map = null;
 
-	public ArgsContainer(String[] cmd_line_args){
+	public ArgsContainer(String[] cmd_line_args) {
 		Parser parser = new Parser();
 		arg_map = parser.mapArgs(cmd_line_args);
 	}
 
-	public ArgsContainer(Map<String, List<String>> arg_map){
-		if(arg_map == null)
+	public ArgsContainer(Map<String, List<String>> arg_map) {
+		if (arg_map == null)
 			this.arg_map = new HashMap<>();
 		this.arg_map = arg_map;
+	}
+
+	String getOneArg(String key) {
+		List<String> list = getArgs(key);
+		return (list == null) ? null : list.get(0);
 	}
 
 	/**
 	 * Get the first argument from the command line with given key.
 	 * 
-	 * @param key Argument to search for.
+	 * @param t Which tag to get first argument from.
 	 * @return First input argument or null if no arguments found.
 	 */
-	String getOneArg(String key) {
-		List<String> list = (arg_map == null) ? null : arg_map.get(key);
-		return (list == null) ? null : list.get(0);
-	}
-
 	public String getOneArg(Args.Tag t) {
 		return getOneArg(t.toString());
+	}
+
+	List<String> getArgs(String key) {
+		return (arg_map == null) ? null : arg_map.get(key);
+	}
+
+	/**
+	 * Get all arguments from the command line with given key.
+	 * 
+	 * @param t Which tag to get arguments from.
+	 * @return List of arguments input with tag t or null if no arguments found.
+	 */
+	public List<String> getArgs(Args.Tag t) {
+		return getArgs(t.toString());
 	}
 
 	/**

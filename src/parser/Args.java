@@ -32,7 +32,8 @@ public final class Args {
 					"Force recompilation from first directive. Ignore any intermediate designs."),
 			new TokenArg(Tag.FORCE.toString(), new String[] { "-f", "--force" },
 					"Force overwrite for ALL output files. You can specify force overwrite for individual "
-					+ "files in the xml building instructions."), // (intermediate files in .iii are always overwritten)
+							+ "files in the xml building instructions."), // (intermediate files in .iii are always
+																			// overwritten)
 			new TokenArg(Tag.QUIET.toString(), new String[] { "-q", "--quiet" },
 					"Display less progress information. Run Vivado tcl commands with '-quiet' flag."),
 			new TokenArg(Tag.VERBOSE.toString(), new String[] { "-v", "--verbose" },
@@ -42,7 +43,6 @@ public final class Args {
 			new TokenArg(Tag.HELP.toString(), HELP_SWITCH, "Print this help message and exit.") };
 
 	static final PositionalArg[] POSITIONAL_ARGS = {
-			new PositionalArg(Tag.XML_DIRECTIVES.toString(), true,
-					"XML file detailing building instructions. See README.md for more.")
-	};
+		new PositionalArg(Tag.XML_DIRECTIVES.toString(), true,
+			"XML file detailing building instructions. See README.md for details.") };
 }

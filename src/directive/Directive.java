@@ -1,20 +1,18 @@
 package directive;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import com.xilinx.rapidwright.util.MessageGenerator;
 
 import org.w3c.dom.Element;
 
 import parser.XMLParser;
+import parser.XMLParser.BaseEnum;
+import parser.XMLParser.TAG;
+import parser.XMLParser.KEY;
 import worker.FileSys;
 
 public class Directive {
@@ -96,7 +94,7 @@ public class Directive {
 	 */
 	public Directive(Element elem, DirectiveHeader head) {
 		this.head = head;
-		
+
 		if (elem == null)
 			return;
 
@@ -108,12 +106,12 @@ public class Directive {
 			MessageGenerator.briefErrorAndExit(
 					"'type = \"" + inst_type_str + "\"' is not a valid attribute for 'inst'.\nExiting.");
 
-		pblock_str = getFirst(elem, INST.pblock);
-		inst_name = getFirst(elem, INST.inst_name);
-		force = getFirstBool(elem, INST.force);
-		hand_placer = getFirstBool(elem, INST.hand_placer);
-		refresh = getFirstBool(elem, INST.refresh);
-		only_wires = getFirstBool(elem, INST.only_wires);
+		pblock_str = XMLParser.getFirst(elem, INST.pblock);
+		inst_name = XMLParser.getFirst(elem, INST.inst_name);
+		force = XMLParser.getFirstBool(elem, INST.force);
+		hand_placer = XMLParser.getFirstBool(elem, INST.hand_placer);
+		refresh = XMLParser.getFirstBool(elem, INST.refresh);
+		only_wires = XMLParser.getFirstBool(elem, INST.only_wires);
 		// file must exist if it a merge and not an only wires cell
 		boolean err_if_not_found = !only_wires && (type == INST.TYPE.TypeEnum.MERGE);
 		dcp = getFirstFile(elem, INST.dcp, head.fsys(), err_if_not_found);
@@ -124,36 +122,9 @@ public class Directive {
 		}
 	}
 
-	static String getFirst(Element elem, TAG t) {
-		String str = null;
-		try {
-			// str = elem.getElementsByTagName(t.key).item(0).getTextContent();
-			str = XMLParser.getChildElementsFromTagName(elem, t.key).peek().getTextContent();
-		} catch (NullPointerException e) {
-			str = null;
-		}
-		return str;
-	}
-
-	static boolean getFirstBool(Element elem, TAG t) {
-		// return (elem.getElementsByTagName(t.key).item(0) != null);
-		return (XMLParser.getChildElementsFromTagName(elem, t.key).peek() != null);
-	}
-
-	// static int getFirstInt(Element elem, TAG t) {
-	// int num = -1;
-	// String str = getFirst(elem, t);
-	// try {
-	// num = Integer.parseInt(str);
-	// } catch (NumberFormatException e) {
-	// num = -1;
-	// }
-	// return num;
-	// }
-
-	static File getFirstFile(Element elem, TAG t, FileSys fsys, boolean err_if_not_found) {
-		String filename = getFirst(elem, t);
-		BaseEnum attr = getFirstAttr(elem, t, FILE.loc);
+	public static File getFirstFile(Element elem, TAG t, FileSys fsys, boolean err_if_not_found) {
+		String filename = XMLParser.getFirst(elem, t);
+		BaseEnum attr = XMLParser.getFirstAttr(elem, t, FILE.loc);
 		if (attr != null) {
 			if (attr == FILE.LOC.LocEnum.III)
 				filename = FileSys.FILE_ROOT.III.subsumePath(filename);
@@ -169,94 +140,9 @@ public class Directive {
 		return fsys.toFile(filename);
 	}
 
-	/**
-	 * Gets an attribute with key=k of the first node with tag=t.
-	 * 
-	 * @param elem Parent to search for tag under.
-	 * @param t    Tag to search for. Use first found instance.
-	 * @param k    Key of attribute to check under node with tag t.
-	 * @return String found representing attribute k of node with type t. Null if
-	 *         can't find.
-	 */
-	static BaseEnum getFirstAttr(Element elem, TAG t, KEY k) {
-		if (k == null)
-			return null;
-		try {
-			// Node node = elem.getElementsByTagName(t.key).item(0);
-			// if (node.getNodeType() == Node.ELEMENT_NODE) {
-			// Element elem2 = (Element) node;
-			// return k.valueOf(elem2.getAttribute(k.key));
-			// }
-			Element elem2 = XMLParser.getChildElementsFromTagName(elem, t.key).peek();
-			return k.valueOf(elem2.getAttribute(k.key));
-		} catch (NullPointerException e) {
-		}
-		return null;
-	}
-
-	static class TAG {
-		final String key;
-		private final List<TAG> children;
-		private final List<KEY> attributes;
-
-		TAG(String key) {
-			this.key = key;
-			children = new ArrayList<>();
-			attributes = new ArrayList<>();
-		}
-
-		TAG(String key, List<TAG> children, List<KEY> attributes) {
-			this.key = key;
-			this.children = children;
-			this.attributes = attributes;
-		}
-
-		public List<TAG> children() {
-			return Collections.unmodifiableList(children);
-		}
-
-		public List<KEY> attributes() {
-			return Collections.unmodifiableList(attributes);
-		}
-	}
-
-	public static interface BaseEnum {
-		String getStr();
-	}
-
-	static abstract class KEY {
-		final String key;
-		private Map<String, BaseEnum> inverse_map;
-		private Set<BaseEnum> values;
-
-		KEY(String key, Set<BaseEnum> values) {
-			this.key = key;
-			this.values = values;
-			inverse_map = new HashMap<>();
-			for (BaseEnum v : values)
-				inverse_map.put(v.getStr(), v);
-		}
-
-		Set<BaseEnum> values() {
-			return Collections.unmodifiableSet(values);
-		}
-
-		boolean isValid(String value) {
-			if (value == null)
-				return false;
-			return inverse_map.containsKey(value);
-		}
-
-		BaseEnum valueOf(String value) {
-			if (value == null)
-				return null;
-			return inverse_map.get(value);
-		}
-	}
-
-	static class FILE extends TAG {
-		static class LOC extends KEY {
-			enum LocEnum implements BaseEnum {
+	public static class FILE extends TAG {
+		public static class LOC extends KEY {
+			public enum LocEnum implements BaseEnum {
 				III("iii"), OOC("ooc"), OUT("out");
 				final String tag_str;
 
@@ -265,7 +151,7 @@ public class Directive {
 				}
 
 				@Override
-				public String getStr() {
+				public String toString() {
 					return tag_str;
 				}
 			}
@@ -275,33 +161,34 @@ public class Directive {
 			}
 		}
 
-		static final LOC loc = new LOC();
+		public static final LOC loc = new LOC();
 
 		FILE(String tag) {
 			super(tag, Arrays.asList(), Arrays.asList(loc));
 		}
 	}
 
-	static class HEADER extends TAG {
-		static final TAG iii_dir = new TAG("iii_dir");
-		static final TAG ooc_dir = new TAG("ooc_dir");
-		static final TAG out_dir = new TAG("out_dir");
-		static final FILE initial = new FILE("initial");
-		static final FILE synth = new FILE("synth");
-		static final TAG name = new TAG("name");
-		static final TAG refresh = new TAG("refresh");
-		static final TAG hand_placer = new TAG("hand_placer");
-		static final TAG buffer_inputs = new TAG("buffer_inputs");
+	public static class HEADER extends TAG {
+		public static final TAG iii_dir = new TAG("iii_dir");
+		public static final TAG ooc_dir = new TAG("ooc_dir");
+		public static final TAG out_dir = new TAG("out_dir");
+		public static final FILE initial = new FILE("initial");
+		public static final FILE synth = new FILE("synth");
+		public static final TAG module_name = new TAG("module_name");
+		public static final TAG refresh = new TAG("refresh");
+		public static final TAG hand_placer = new TAG("hand_placer");
+		public static final TAG buffer_inputs = new TAG("buffer_inputs");
 
 		HEADER() {
-			super("header", Arrays.asList(iii_dir, ooc_dir, out_dir, initial, synth, name, refresh, buffer_inputs),
+			super("header",
+					Arrays.asList(iii_dir, ooc_dir, out_dir, initial, synth, module_name, refresh, buffer_inputs),
 					Arrays.asList());
 		}
 	}
 
-	static class INST extends TAG {
-		static class TYPE extends KEY {
-			private enum TypeEnum implements BaseEnum {
+	public static class INST extends TAG {
+		public static class TYPE extends KEY {
+			public enum TypeEnum implements BaseEnum {
 				MERGE("merge"), WRITE("write"), BUILD("build");
 				final String tag_str;
 
@@ -310,7 +197,7 @@ public class Directive {
 				}
 
 				@Override
-				public String getStr() {
+				public String toString() {
 					return tag_str;
 				}
 			}
@@ -320,14 +207,14 @@ public class Directive {
 			}
 		}
 
-		static final FILE dcp = new FILE("dcp");
-		static final TAG pblock = new TAG("pblock");
-		static final TAG inst_name = new TAG("name");
-		static final TAG force = new TAG("force");
-		static final TAG hand_placer = new TAG("hand_placer");
-		static final TAG refresh = new TAG("refresh");
-		static final TAG only_wires = new TAG("only_wires");
-		static final TYPE type = new TYPE();
+		public static final FILE dcp = new FILE("dcp");
+		public static final TAG pblock = new TAG("pblock");
+		public static final TAG inst_name = new TAG("iname");
+		public static final TAG force = new TAG("force");
+		public static final TAG hand_placer = new TAG("hand_placer");
+		public static final TAG refresh = new TAG("refresh");
+		public static final TAG only_wires = new TAG("only_wires");
+		public static final TYPE type = new TYPE();
 
 		INST() {
 			super("inst", new ArrayList<TAG>(Arrays.asList(dcp, pblock, inst_name, force, hand_placer, refresh)),
@@ -335,6 +222,6 @@ public class Directive {
 		}
 	}
 
-	static final HEADER header = new HEADER();
-	static final INST inst = new INST();
+	public static final HEADER header = new HEADER();
+	public static final INST inst = new INST();
 }

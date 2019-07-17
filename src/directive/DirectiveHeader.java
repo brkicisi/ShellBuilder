@@ -7,6 +7,7 @@ import org.w3c.dom.Element;
 import com.xilinx.rapidwright.util.MessageGenerator;
 
 import directive.Directive.HEADER;
+import parser.XMLParser;
 import worker.FileSys;
 
 public class DirectiveHeader {
@@ -17,7 +18,7 @@ public class DirectiveHeader {
 	boolean buffer_inputs = false;
 	File initial_dcp = null;
 	File top_level_synth = null;
-	String name;
+	String module_name = null;
 	DirectiveHeader parent = null;
 
 	public DirectiveHeader(boolean verbose) {
@@ -38,7 +39,7 @@ public class DirectiveHeader {
 	public void addHeader(Element elem) {
 		fsys = new FileSys(verbose);
 		// set fsys roots
-		String text = Directive.getFirst(elem, HEADER.iii_dir);
+		String text = XMLParser.getFirst(elem, HEADER.iii_dir);
 		if (text != null)
 			fsys.setDirRoot(FileSys.FILE_ROOT.III, text);
 		else if (parent != null)
@@ -46,13 +47,13 @@ public class DirectiveHeader {
 		else
 			fsys.setDirRoot(FileSys.FILE_ROOT.III, (String) null);
 
-		text = Directive.getFirst(elem, HEADER.ooc_dir);
+		text = XMLParser.getFirst(elem, HEADER.ooc_dir);
 		if (text != null)
 			fsys.setDirRoot(FileSys.FILE_ROOT.OOC, text);
 		else if (parent != null)
 			fsys.setDirRoot(FileSys.FILE_ROOT.OOC, parent.fsys().getRoot(FileSys.FILE_ROOT.OOC));
 
-		text = Directive.getFirst(elem, HEADER.out_dir);
+		text = XMLParser.getFirst(elem, HEADER.out_dir);
 		if (text != null)
 			fsys.setDirRoot(FileSys.FILE_ROOT.OUT, text);
 		else if (parent != null)
@@ -67,16 +68,16 @@ public class DirectiveHeader {
 		if (top_level_synth == null || !top_level_synth.exists())
 			top_level_synth = null;
 
-		refresh = Directive.getFirstBool(elem, HEADER.refresh);
+		refresh = XMLParser.getFirstBool(elem, HEADER.refresh);
 
-		hand_placer = Directive.getFirstBool(elem, HEADER.hand_placer);
+		hand_placer = XMLParser.getFirstBool(elem, HEADER.hand_placer);
 
-		buffer_inputs = Directive.getFirstBool(elem, HEADER.buffer_inputs);
+		buffer_inputs = XMLParser.getFirstBool(elem, HEADER.buffer_inputs);
 
-		name = Directive.getFirst(elem, HEADER.name);
-		if (name != null && name.indexOf(' ') > 0) {
-			printIfVerbose("Replacing spaces with underscores in input name '" + name + "'.");
-			name = name.replace(" ", "_");
+		module_name = XMLParser.getFirst(elem, HEADER.module_name);
+		if (module_name != null && module_name.indexOf(' ') > 0) {
+			printIfVerbose("Replacing spaces with underscores in input module_name '" + module_name + "'.");
+			module_name = module_name.replace(" ", "_");
 		}
 	}
 
@@ -93,8 +94,8 @@ public class DirectiveHeader {
 		return (fsys == null) ? null : fsys.getRoot(FileSys.FILE_ROOT.III);
 	}
 
-	public String getName() {
-		return name;
+	public String getModuleName() {
+		return module_name;
 	}
 
 	public FileSys fsys() {
