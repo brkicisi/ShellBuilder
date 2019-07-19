@@ -1,6 +1,7 @@
-package directive;
+package main.directive;
 
-import parser.XMLParser;
+import main.parser.XMLParser;
+import main.directive.DirectiveWriter.TemplateBuilder;
 
 import java.io.File;
 import java.util.ArrayDeque;
@@ -11,8 +12,14 @@ import java.util.Queue;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import directive.DirectiveWriter.TemplateBuilder;
 
+
+/**
+ * Wrapper to parse and store a set of sibling {@link Directive direcitves} and
+ * a {@link DirectiveHeader header}.
+ * <p>
+ * Also stores a list of {@link TemplateBuilder TemplateBuilders} when parsing.
+ */
 public class DirectiveBuilder {
 	private ArrayDeque<Directive> directives = null;
 	private ArrayDeque<TemplateBuilder> template_builders = null;
@@ -23,34 +30,77 @@ public class DirectiveBuilder {
 		template_builders = new ArrayDeque<>();
 	}
 
+	/**
+	 * Initializes builder and {@link #parse(Element, boolean) parses} file.
+	 * 
+	 * @param input_file File to parse.
+	 * @param verbose    Print extra messages.
+	 */
 	public DirectiveBuilder(File input_file, boolean verbose) {
 		this();
 		parse(input_file, verbose);
 	}
 
+	/**
+	 * Parse the input xml build file and appends directives and template builders
+	 * in this object.
+	 * <p>
+	 * If calling this multiple times, be aware that lists are not cleared between
+	 * parses but header is replaced which may cause errors. You probably want
+	 * multiple {@link DirectiveBuilder} objects instead.
+	 * 
+	 * @param input_file XML build file to parse.
+	 * @param verbose    Print extra messages.
+	 */
 	public void parse(File input_file, boolean verbose) {
 		Document doc = XMLParser.parse(input_file);
 		parse(doc.getDocumentElement(), verbose);
 	}
 
+	/**
+	 * Parse the input xml build file and appends directives and template builders
+	 * in this object.
+	 * <p>
+	 * If calling this multiple times, be aware that lists are not cleared between
+	 * parses but header is replaced which may cause errors. You probably want
+	 * multiple {@link DirectiveBuilder} objects instead.
+	 * 
+	 * @param element Root element containing {@link DirectiveHeader header} and/or
+	 *                {@link Directive directives} and/or {@link TemplateBuilder
+	 *                template builders} to parse.
+	 * @param verbose Print extra messages.
+	 */
 	public void parse(Element element, boolean verbose) {
 		parse(element, verbose, null);
 	}
 
+	/**
+	 * Parse the input xml build file and appends directives and template builders
+	 * in this object.
+	 * <p>
+	 * If calling this multiple times, be aware that lists are not cleared between
+	 * parses but header is replaced which may cause errors. You probably want
+	 * multiple {@link DirectiveBuilder} objects instead.
+	 * 
+	 * @param element     Root element containing {@link DirectiveHeader header}
+	 *                    and/or {@link Directive directives} and/or
+	 *                    {@link TemplateBuilder template builders} to parse.
+	 * @param verbose     Print extra messages.
+	 * @param parent_head Sibling header to parent of element.
+	 */
 	public void parse(Element element, boolean verbose, DirectiveHeader parent_head) {
-		// parse header
+		// Parse one header
 		head = new DirectiveHeader(parent_head, verbose);
-
-		Queue<Element> header_children = XMLParser.getChildElementsFromTagName(element, Directive.header.key);
+		Queue<Element> header_children = XMLParser.getChildElementsFromTagName(element, DirectiveHeader.header.key);
 		if (!header_children.isEmpty())
 			head.addHeader(header_children.peek());
 
-		// parse each directive onto list
+		// Parse each directive onto list
 		Queue<Element> inst_children = XMLParser.getChildElementsFromTagName(element, Directive.inst.key);
 		for (Element elem : inst_children)
 			directives.offer(new Directive(elem, head));
 
-		// parse each directive onto list
+		// Parse each directive onto list
 		Queue<Element> template_children = XMLParser.getChildElementsFromTagName(element, DirectiveWriter.template.key);
 		for (Element elem : template_children)
 			template_builders.offer(new TemplateBuilder(elem, head));
@@ -67,25 +117,4 @@ public class DirectiveBuilder {
 	public Collection<TemplateBuilder> getTemplateBuilders() {
 		return Collections.unmodifiableCollection(template_builders);
 	}
-
-	// public static DirectiveBuilder makeWrapperBuilder(File dcp, ArgsContainer
-	// args){
-	// DirectiveBuilder db = new DirectiveBuilder();
-	// DirectiveHeader head = new DirectiveHeader(args.verbose());
-	// // head.
-	// Directive dir = new Directive(null, head);
-	// }
-
-	// static Directive makeMergeDirective() {
-
-	// dir.type = INST.TYPE.TypeEnum.MERGE;
-	// dir.dcp = dcp;
-
-	// pblock_str = getFirst(elem, INST.pblock);
-	// inst_name = getFirst(elem, INST.inst_name);
-	// force = getFirstBool(elem, INST.force);
-	// hand_placer = getFirstBool(elem, INST.hand_placer);
-	// refresh = getFirstBool(elem, INST.refresh);
-	// only_wires = getFirstBool(elem, INST.only_wires);
-	// }
 }
