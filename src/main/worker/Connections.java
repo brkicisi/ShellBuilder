@@ -1,5 +1,5 @@
 
-package worker;
+package main.worker;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,11 +11,14 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 
-import util.DesignUtils;
-import worker.MyPort;
-import directive.DirectiveBuilder;
-import directive.Directive;
+import main.util.DesignUtils;
+import main.worker.MyPort;
+import main.directive.DirectiveBuilder;
+import main.directive.Directive;
 
+/**
+ * @deprecated Using top level synth as a template instead.
+ */
 public class Connections {
 
 	Map<MyPort, Set<MyPort>> conn = null;

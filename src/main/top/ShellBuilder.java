@@ -1,4 +1,4 @@
-package top;
+package main.top;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.util.MessageGenerator;
@@ -8,18 +8,23 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
-import parser.Args;
-import parser.ArgsContainer;
-import util.DesignUtils;
-import worker.Merger;
-import directive.*;
-import worker.FileSys;
+import main.parser.Args;
+import main.parser.ArgsContainer;
+import main.util.DesignUtils;
+import main.worker.Merger;
+import main.directive.*;
+import main.worker.FileSys;
 
 import java.io.File;
 import java.io.IOException;
 
+/**
+ * Main orchestrating program for building shells.
+ * 
+ * @author Igi Brkic
+ * @since Summer 2019
+ */
 public class ShellBuilder {
-
 	ArgsContainer args = null;
 
 	public ShellBuilder() {
@@ -38,6 +43,10 @@ public class ShellBuilder {
 	/**
 	 * Ensure that if the user has not specified to force overwrite, output dcp
 	 * files don't collide with already existing files.
+	 * <p>
+	 * Exits with error if not force and collision.
+	 * 
+	 * @param directive Check output files associated with this directive.
 	 */
 	private void checkFileCollision(Directive directive) {
 		if (args.force() || directive.isForce())
@@ -53,17 +62,18 @@ public class ShellBuilder {
 
 		// if any would overwrite, exit
 		if (any_err)
-			MessageGenerator.briefErrorAndExit("Use force (-f) to overwrite.\nExiting.\n");
+			MessageGenerator.briefErrorAndExit("Use force (-f) or <force> to overwrite.\nExiting.\n");
 	}
 
 	/**
-	 * Execute instructions provided by directive.
+	 * Execute instruction provided by directive.
 	 * 
-	 * @param directive Instructions to execute.
+	 * @param directive Instruction to execute.
+	 * @param merger    Merge directives into this if "merge" or "build".
 	 */
 	private void runDirective(Directive directive, Merger merger) {
 		if (directive.isSubBuilder()) {
-			// TODO check for cached hierarchial solutions
+			// check for cached hierarchial solutions
 			File cached_dcp = Merger.findModuleInCache(directive, args);
 			if (cached_dcp != null) {
 				directive.setDCP(cached_dcp);
@@ -92,6 +102,12 @@ public class ShellBuilder {
 		}
 	}
 
+	/**
+	 * Execute instructions provided in directive_builder.
+	 * 
+	 * @param directive_builder Instructions representing a design.
+	 * @return Merged, placed and routed design.
+	 */
 	public Merger runBuilder(DirectiveBuilder directive_builder) {
 		Merger merger = null;
 		DirectiveHeader head = directive_builder.getHeader();
@@ -108,9 +124,7 @@ public class ShellBuilder {
 			printIfVerbose("Initializing initial merger base design with module name '" + module_name + "'.");
 			merger = new Merger();
 		}
-		// this currently just executes everything
-		// it checks for cached designs, but doesn't check for cached partial
-		// hierarchial designs
+
 		for (Directive step : directive_builder.getDirectives())
 			runDirective(step, merger);
 
@@ -133,7 +147,7 @@ public class ShellBuilder {
 				write_dcp = null;
 		}
 		if (write_dcp != null) {
-			// if last directive was a write, write placed and routed module to this final
+			// If last directive was a write, write placed and routed module to this final
 			// write location.
 			try {
 				Path from = Paths.get(out_dcp.getAbsolutePath());
@@ -145,12 +159,7 @@ public class ShellBuilder {
 				f = new File(write_dcp.getParentFile(), write_dcp.getName().replace(".dcp", ".edf"));
 				to = Paths.get(f.getAbsolutePath());
 				Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
-
-				// Files.copy(out_dcp, write_dcp);
-				// Files.copy(new File(out_dcp.getParentFile(),
-				// out_dcp.getName().replace(".dcp", ".edf")),
-				// new File(write_dcp.getParentFile(), write_dcp.getName().replace(".dcp",
-				// ".edf")));
+				printIfVerbose("\nCopied checkpoint and edif from cache to '" + write_dcp.getParent() + "'");
 			} catch (IOException ioe) {
 				printIfVerbose("Failed to copy checkpoint and edif from cache to '" + write_dcp.getParent() + "'");
 			}
@@ -159,14 +168,29 @@ public class ShellBuilder {
 		return merger;
 	}
 
+	/**
+	 * Execute all {@link main.directive.DirectiveWriter.TemplateBuilder template builders} in this
+	 * directive_builder and in all it's descendant builders.
+	 * 
+	 * @param directive_builder Top directive builder.
+	 */
 	public void runTemplateBuilder(DirectiveBuilder directive_builder) {
 		for (DirectiveWriter.TemplateBuilder template_builder : directive_builder.getTemplateBuilders())
-			template_builder.writeTemplate();
+			template_builder.writeTemplate(args.force());
 		for (Directive dir : directive_builder.getDirectives())
 			if (dir.isSubBuilder())
 				runTemplateBuilder(dir.getSubBuilder());
 	}
 
+	/**
+	 * Highest level orchestrator.
+	 * <p>
+	 * Parses command line args. Parses xml_directives file input at command line.
+	 * Run all {@link main.directive.DirectiveWriter.TemplateBuilder template builders}. Run top
+	 * {@link DirectiveBuilder directive builder}.
+	 * 
+	 * @param cmd_line_args Command line arguments.
+	 */
 	public void start(String[] cmd_line_args) {
 		args = new ArgsContainer(cmd_line_args);
 		FileSys fsys = new FileSys(args.verbose());
@@ -181,6 +205,11 @@ public class ShellBuilder {
 		MessageGenerator.briefMessage("\nFinished.");
 	}
 
+	/**
+	 * Run a {@link ShellBuilder}.
+	 * 
+	 * @param args Command line arguments.
+	 */
 	public static void main(String[] args) {
 		ShellBuilder builder = new ShellBuilder();
 		builder.start(args);

@@ -1,4 +1,4 @@
-package worker;
+package main.worker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,12 +9,15 @@ import com.xilinx.rapidwright.design.*;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.*;
 
-import directive.Directive;
-import parser.ArgsContainer;
-import tcl.TCLEnum;
-import tcl.TCLScript;
-import util.DesignUtils;
+import main.directive.Directive;
+import main.parser.ArgsContainer;
+import main.tcl.TCLEnum;
+import main.tcl.TCLScript;
+import main.util.DesignUtils;
 
+/**
+ * @deprecated Replaced by {@link Merger}.
+ */
 public class Merge {
 	Design original = null;
 	String clk_name = null;
@@ -110,7 +113,6 @@ public class Merge {
 	 * ILAInserter:applyILAToDesign().
 	 * 
 	 * @param mergee          Design to merge with this.
-	 * @param mergee_clk_name Name of top level clk in mergee design.
 	 */
 	public void merge(Design mergee) {
 		if (original == null) {

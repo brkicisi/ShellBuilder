@@ -1,13 +1,12 @@
-
-package parser;
+package main.parser;
 
 /**
- * stores info relating to a positional argument
+ * Stores info relating to a positional argument.
  */
 class PositionalArg {
     String name;
-    String help_str;
-    boolean required;
+	boolean required;
+	String help_str;
 
     public PositionalArg(String name, boolean required) {
         this(name, required, null);
@@ -19,6 +18,9 @@ class PositionalArg {
         this.help_str = help_str;
     }
 
+	/**
+	 * Stylized print this argument.
+	 */
     @Override
     public String toString() {
         if (required)

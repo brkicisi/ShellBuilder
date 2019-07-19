@@ -1,4 +1,4 @@
-package directive;
+package main.directive;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -9,13 +9,22 @@ import com.xilinx.rapidwright.util.MessageGenerator;
 
 import org.w3c.dom.Element;
 
-import parser.XMLParser;
-import parser.XMLParser.BaseEnum;
-import parser.XMLParser.TAG;
-import parser.XMLParser.KEY;
-import worker.FileSys;
+import main.parser.XMLParser;
+import main.parser.XMLParser.BaseEnum;
+import main.parser.XMLParser.TAG;
+import main.parser.XMLParser.KEY;
+import main.worker.FileSys;
 
+/**
+ * Describes an instruction regarding how to construct the design.
+ * <p>
+ * {@link INST.TYPE Types}: merge, build, write.
+ */
 public class Directive {
+	/**
+	 * Header from this {@link Directive directive}'s parent (ie. header which is
+	 * sibling to this inst)
+	 */
 	DirectiveHeader head = null;
 	BaseEnum type = null;
 	String inst_name = null;
@@ -27,6 +36,10 @@ public class Directive {
 	boolean only_wires = false;
 	DirectiveBuilder sub_builder = null;
 
+	/**
+	 * @return Header from this directive's parent (ie. header which is sibling to
+	 *         this inst)
+	 */
 	public DirectiveHeader getHeader() {
 		return head;
 	}
@@ -88,9 +101,13 @@ public class Directive {
 	}
 
 	/**
-	 * Parses an element describing an <inst>.
+	 * Parses an element describing a directive.
+	 * <p>
+	 * Sets fields of this object to the value from the first found child of the field's
+	 * type.
 	 * 
-	 * @param elem Element to parse
+	 * @param elem Element to parse.
+	 * @param head Header includes data and fsys to resolve files against.
 	 */
 	public Directive(Element elem, DirectiveHeader head) {
 		this.head = head;
@@ -98,7 +115,7 @@ public class Directive {
 		if (elem == null)
 			return;
 
-		// determine what 'type' of inst
+		// Determine what 'type' of inst
 		// <inst type="value">
 		String inst_type_str = elem.getAttribute(INST.type.key);
 		type = INST.type.valueOf(inst_type_str);
@@ -112,7 +129,8 @@ public class Directive {
 		hand_placer = XMLParser.getFirstBool(elem, INST.hand_placer);
 		refresh = XMLParser.getFirstBool(elem, INST.refresh);
 		only_wires = XMLParser.getFirstBool(elem, INST.only_wires);
-		// file must exist if it a merge and not an only wires cell
+
+		// File must exist if it a merge and not an only wires cell
 		boolean err_if_not_found = !only_wires && (type == INST.TYPE.TypeEnum.MERGE);
 		dcp = getFirstFile(elem, INST.dcp, head.fsys(), err_if_not_found);
 
@@ -122,8 +140,24 @@ public class Directive {
 		}
 	}
 
-	public static File getFirstFile(Element elem, TAG t, FileSys fsys, boolean err_if_not_found) {
+	/**
+	 * Return file described by first child of elem with tag t.
+	 * <p>
+	 * File is described by the text content and optionally loc attribute of the
+	 * instance of tag t.
+	 * 
+	 * @param elem             Search children of this element.
+	 * @param t                Tag to search for.
+	 * @param fsys             FileSys to resolve file against.
+	 * @param err_if_not_found Must this file already exist? Usually true for input
+	 *                         files, false for output files.
+	 * @return File found under elem with tag t. Null if no instances of t were
+	 *         found.
+	 */
+	public static File getFirstFile(Element elem, FILE t, FileSys fsys, boolean err_if_not_found) {
 		String filename = XMLParser.getFirst(elem, t);
+		if (filename == null)
+			return null;
 		BaseEnum attr = XMLParser.getFirstAttr(elem, t, FILE.loc);
 		if (attr != null) {
 			if (attr == FILE.LOC.LocEnum.III)
@@ -140,7 +174,19 @@ public class Directive {
 		return fsys.toFile(filename);
 	}
 
+	/**
+	 * Tag describing a file (extends {@link TAG}).
+	 * <p>
+	 * Provides support for the optional attribute loc to indicate iii, ooc, or out.
+	 * Attribute {@link LOC loc} should be used in conjunction with the sibling
+	 * {@link DirectiveHeader#fsys()} to determine an absolute location of the file.
+	 */
 	public static class FILE extends TAG {
+		/**
+		 * Location attribute (extends {@link TAG}).
+		 * <p>
+		 * Parallels {@link FileSys.FILE_ROOT}
+		 */
 		public static class LOC extends KEY {
 			public enum LocEnum implements BaseEnum {
 				III("iii"), OOC("ooc"), OUT("out");
@@ -168,25 +214,13 @@ public class Directive {
 		}
 	}
 
-	public static class HEADER extends TAG {
-		public static final TAG iii_dir = new TAG("iii_dir");
-		public static final TAG ooc_dir = new TAG("ooc_dir");
-		public static final TAG out_dir = new TAG("out_dir");
-		public static final FILE initial = new FILE("initial");
-		public static final FILE synth = new FILE("synth");
-		public static final TAG module_name = new TAG("module_name");
-		public static final TAG refresh = new TAG("refresh");
-		public static final TAG hand_placer = new TAG("hand_placer");
-		public static final TAG buffer_inputs = new TAG("buffer_inputs");
-
-		HEADER() {
-			super("header",
-					Arrays.asList(iii_dir, ooc_dir, out_dir, initial, synth, module_name, refresh, buffer_inputs),
-					Arrays.asList());
-		}
-	}
-
+	/**
+	 * Recognized tags for {@link Directive} inst (extends {@link TAG}).
+	 */
 	public static class INST extends TAG {
+		/**
+		 * Attribute describing type of instruction (extends {@link KEY}).
+		 */
 		public static class TYPE extends KEY {
 			public enum TypeEnum implements BaseEnum {
 				MERGE("merge"), WRITE("write"), BUILD("build");
@@ -222,6 +256,5 @@ public class Directive {
 		}
 	}
 
-	public static final HEADER header = new HEADER();
 	public static final INST inst = new INST();
 }

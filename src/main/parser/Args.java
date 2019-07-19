@@ -1,8 +1,8 @@
 
-package parser;
+package main.parser;
 
-import parser.PositionalArg;
-import parser.TokenArg;
+import main.parser.PositionalArg;
+import main.parser.TokenArg;
 
 /**
  * Define valid command line arguments here
@@ -26,7 +26,7 @@ public final class Args {
 
 	static final String[] HELP_SWITCH = { "-h", "--help" };
 
-	// used {f, h, q, r, Vv}
+	// Used {f, h, q, r, Vv}
 	static final TokenArg[] TOKEN_LIST = {
 			new TokenArg(Tag.REFRESH.toString(), new String[] { "-r", "--refresh" },
 					"Force recompilation from first directive. Ignore any intermediate designs."),

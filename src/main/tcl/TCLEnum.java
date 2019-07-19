@@ -1,11 +1,11 @@
-package tcl;
+package main.tcl;
 
 import com.xilinx.rapidwright.util.FileTools;
 
 import java.io.File;
 
 /**
- * Enum containing supported tcl commands
+ * Enum containing supported tcl commands.
  */
 public enum TCLEnum {
     SOURCE_RW("source " + FileTools.getRapidWrightPath() + File.separator + FileTools.TCL_FOLDER_NAME + File.separator

@@ -1,4 +1,4 @@
-package util;
+package main.util;
 
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.FileTools;
@@ -9,6 +9,11 @@ import java.util.Map.Entry;
 import java.util.List;
 import java.util.ArrayList;
 
+/**
+ * Some functions to assist with reading and writing key, value pair files.
+ * <p>
+ * Note: Unused since using xml files instead.
+ */
 public class FileUtils {
     /**
      * Read a mapping file. Ignores blank lines and lines beginning with '#'. Strips

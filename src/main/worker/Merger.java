@@ -1,4 +1,4 @@
-package worker;
+package main.worker;
 
 import java.io.File;
 import java.util.HashSet;
@@ -30,12 +30,32 @@ import com.xilinx.rapidwright.placer.handplacer.HandPlacer;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.MessageGenerator;
 
-import parser.ArgsContainer;
-import tcl.TCLEnum;
-import tcl.TCLScript;
-import directive.*;
-import util.DesignUtils;
+import main.parser.ArgsContainer;
+import main.tcl.TCLEnum;
+import main.tcl.TCLScript;
+import main.directive.Directive;
+import main.directive.DirectiveHeader;
+import main.directive.DependancyMeta;
+import main.util.DesignUtils;
 
+/**
+ * Main worker to cache and merge dcps.
+ * <p>
+ * Must be initialized with a design. Either an initial design is provided or a
+ * new Design is created. After that, other designs can be merged into the
+ * Merger. This is important if working with cells that only have wires since
+ * such cells are copied from synth design and don't have a design themselves.
+ * <p>
+ * {@link main.top.ShellBuilder#runBuilder(main.directive.DirectiveBuilder)
+ * ShellBuilder.runBuilder} runs all sibling directives in a directive builder
+ * using a Merger.
+ * <p>
+ * A Merger object can only work at one level of hierarchy. To construct
+ * hierarchial levels, merge the design from one Merger into another Merger. See
+ * {@link main.top.ShellBuilder#runDirective(Directive directive, Merger merger)
+ * ShellBuilder.runDirective} for how a build directive recurses on runBuilder
+ * to create hierarchy.
+ */
 public class Merger {
 	private Design design = null;
 	private Device device = null;
@@ -43,15 +63,36 @@ public class Merger {
 	private Set<String> wire_cells = new HashSet<>();
 	private File final_dcp = null;
 
+	/**
+	 * Name of cache folder in iii directory.
+	 */
 	public static final String MODULE_CACHE = "moduleCache";
 
+	/**
+	 * Uninitialized Merger.
+	 */
 	public Merger() {
 	}
 
+	/**
+	 * Initialize Merger by calling
+	 * {@link #init(Design, DirectiveHeader, ArgsContainer) init}
+	 */
 	public Merger(Design design, DirectiveHeader head, ArgsContainer args) {
 		init(design, head, args);
 	}
 
+	/**
+	 * Initialize Merger.
+	 * <p>
+	 * Copies all cells and copies top level ports from synth design cell with same
+	 * name as design d.
+	 * 
+	 * @param d    Base design to merge other designs into.
+	 * @param head Data common to the sibling directives that will be merged into
+	 *             this design.
+	 * @param args Arguments from the command line.
+	 */
 	public void init(Design d, DirectiveHeader head, ArgsContainer args) {
 		design = d;
 		design.setDesignOutOfContext(!head.isBufferedInputs());
@@ -83,28 +124,15 @@ public class Merger {
 	}
 
 	/**
-	 * Top level functions to fetch dcp (from Directive:getDCP() or from
-	 * .iii/cache), insert it into this.design and connect as many connections as it
-	 * can find using top level synthesized design from header.
+	 * Top level functions to fetch dcp (from {@link Directive#getDCP() directive}
+	 * or from .iii/{@link #MODULE_CACHE}), insert it into design and connect as
+	 * many {@link EDIFNet EDIFNets} as it can find using top level synthesized
+	 * design from header.
 	 * 
 	 * @param directive Merge directive including the dcp to be merged.
-	 * @param args      Command line args.
+	 * @param args      Arguments from command line.
 	 */
 	public void merge(Directive directive, ArgsContainer args) {
-		// String module_name = getModuleName(directive, args);
-		// if (module_name == null)
-		// MessageGenerator.briefErrorAndExit("Null module name");
-		// String pblock = directive.getPBlockStr();
-		// if (pblock == null)
-		// MessageGenerator.briefErrorAndExit("No pblock specified for '" + module_name
-		// + "'.");
-		// // create cache folder in iii
-		// File cache_impl_dir = new File(directive.getIII(),
-		// MODULE_CACHE + "/" + module_name + "/" + pblock.replace(' ', '+'));
-		// if (!cache_impl_dir.isDirectory())
-		// cache_impl_dir.mkdirs();
-		// DependancyMeta.writeMeta(cache_impl_dir, directive, args);
-
 		Module mod = fetchAndPrepModule(directive, args);
 		if (design == null) {
 			if (directive.getHeader().getModuleName() != null)
@@ -114,18 +142,23 @@ public class Merger {
 				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
 		}
 		insertOOC(mod, directive);
-		connectAll(directive.getHeader(), args);
+		connectAll(args);
 	}
 
 	/**
-	 * Check if module exists in cache. If it exists, is more recent and pblock
-	 * matches (or no pblock specified) then use cached dcp.
+	 * Find and load a {@link Module} from cache - place & route and store in cache
+	 * if not already in cache.
+	 * <p>
+	 * Check if module exists in cache
+	 * ({@link #findModuleInCache(Directive, ArgsContainer) findModuleInCache}). If
+	 * it is not in cache, fetch dcp from {@link Directive#getDCP() directive}.
+	 * Place and Route dcp ooc in pblock and save to cache.
+	 * <p>
+	 * Then load design from cache into a Module.
 	 * 
-	 * Else fetch dcp from Directive:getDCP(). Place and Route dcp ooc in pblock and
-	 * save to cache.
-	 * 
-	 * @param directive Merge directive including dcp and pblock.
-	 * @param args      Command line args.
+	 * @param directive Merge directive including dcp and pblock (or build directive
+	 *                  whose dcp has been set to built sub design dcp in cache).
+	 * @param args      Arguments from command line.
 	 * @return Placed and routed module.
 	 */
 	private Module fetchAndPrepModule(Directive directive, ArgsContainer args) {
@@ -202,11 +235,57 @@ public class Merger {
 		return mod;
 	}
 
+	/**
+	 * Searches cache for a module.
+	 * <p>
+	 * Checks if design specified by directive exists in cache. If directive is a
+	 * "build" then recurse on all designs this design is built from and check that
+	 * none has been modified more recently than the candidate cached design for
+	 * this directive. Else directive is a "merge", check that it's specified dcp is
+	 * not more recent than the candidate cached design for this directive. Check
+	 * for consistancy in the stored metadata and the specifications of this
+	 * instruction.
+	 * <p>
+	 * Notes:
+	 * <p>
+	 * Specified pblock is used as part of search path for cache. Thus a cached
+	 * design will not be found if the pblock of this directive doesn't match the
+	 * pblock of any cached instance of this design (no pblock specified is a match
+	 * with cached module not having a specified pblock).
+	 * <p>
+	 * A given design may be cached multiple times with different pblocks.
+	 * <p>
+	 * Pblock specification must be exactly consistant when searching cache
+	 * especially when a pblock string consists of multiple rectangles.
+	 * '{@literal <rect_1>}&nbsp;{@literal <rect_2>}' is not the same as
+	 * '{@literal <rect_2>}&nbsp;{@literal <rect_1>}' even though they are the same
+	 * in tcl.
+	 * 
+	 * @param directive Merge or build directive to search for in cache.
+	 * @param args      Arguments from command line.
+	 * @return File if found in cache, matches dependancies and pblock, and up to
+	 *         date. Null otherwise.
+	 */
 	public static File findModuleInCache(Directive directive, ArgsContainer args) {
 		return findModuleInCache(directive, args, new DependancyMeta.DepSet());
 	}
 
+	/**
+	 * Searches cache for a design assuming visited designs exist and are up to
+	 * date.
+	 * 
+	 * @param directive Merge or build directive to search for in cache.
+	 * @param args      Arguments from command line.
+	 * @param visited   already visited modules.
+	 * @return File if found in cache, matches dependancies and pblock, and up to
+	 *         date. Null otherwise.
+	 * 
+	 * @see #findModuleInCache(Directive, ArgsContainer)
+	 */
 	public static File findModuleInCache(Directive directive, ArgsContainer args, DependancyMeta.DepSet visited) {
+		if (visited == null)
+			visited = new DependancyMeta.DepSet();
+
 		File cache_dir = new File(directive.getIII(), MODULE_CACHE);
 		if (!cache_dir.isDirectory()) {
 			printIfVerbose("\nCache directory was not found at '" + cache_dir.getAbsolutePath() + "'.", args.verbose());
@@ -245,11 +324,10 @@ public class Merger {
 			return null;
 		}
 
-		// TODO findModuleInCache() checks for build
 		// read metadata
 		File meta_file = new File(impl_dir, DependancyMeta.META_FILENAME);
 		DependancyMeta meta = new DependancyMeta(meta_file, args.verbose());
-		DependancyMeta.DepSet dep_set = meta.initDepSet();
+		DependancyMeta.DepSet dep_set = new DependancyMeta.DepSet(meta);
 		DependancyMeta.DepSet dep_set2 = new DependancyMeta.DepSet(dep_set);
 
 		String s1 = directive.getHeader().getTopLevelSynth() == null ? ""
@@ -279,9 +357,6 @@ public class Merger {
 					continue;
 				String sub_mod = getModuleName(dir, args);
 				String sub_pblock = (dir.getPBlockStr() == null) ? "" : dir.getPBlockStr();
-				if (visited.contains(sub_mod, sub_pblock))
-					continue;
-				visited.put(sub_mod, sub_pblock);
 
 				String sub_pblock_plus = sub_pblock.replace(" ", "+");
 				if (!dep_set.contains(sub_mod, sub_pblock_plus)) {
@@ -290,6 +365,10 @@ public class Merger {
 					return null;
 				}
 				dep_set2.remove(sub_mod, sub_pblock_plus);
+
+				if (visited.contains(sub_mod, sub_pblock))
+					continue;
+				visited.put(sub_mod, sub_pblock);
 
 				File sub = findModuleInCache(dir, args, visited);
 				if (sub == null)
@@ -377,6 +456,13 @@ public class Merger {
 		return output_dcp;
 	}
 
+	/**
+	 * Find the module name of a given directive.
+	 * 
+	 * @param directive Instructions for creating an instance of a module.
+	 * @param args      Arguments from command line.
+	 * @return Name of the module specified in directive.
+	 */
 	private static String getModuleName(Directive directive, ArgsContainer args) {
 		String module_name = null;
 		if (directive.isSubBuilder())
@@ -403,6 +489,7 @@ public class Merger {
 	 * 
 	 * @param mod       Module to be merged into design.
 	 * @param directive Merge directive including whether to open handplacer.
+	 * @return An anchored instance of Module mod. Null if failed.
 	 */
 	private ModuleInst insertOOC(Module mod, Directive directive) {
 		if (mod == null)
@@ -467,19 +554,33 @@ public class Merger {
 		return mi;
 	}
 
-	private EDIFNet getOrMakeEDIFNet(String name, EDIFCell parentCell) {
-		EDIFNet net = parentCell.getNet(name);
+	/**
+	 * Get named EDIFNet if it exists in parent_cell else create the net in
+	 * parent_cell.
+	 * 
+	 * @param name        Search for an EDIFNet of this name.
+	 * @param parent_cell Search nets in this EDIFCell.
+	 * @return An EDIFNet with the given name and parent cell.
+	 */
+	private EDIFNet getOrMakeEDIFNet(String name, EDIFCell parent_cell) {
+		EDIFNet net = parent_cell.getNet(name);
 		if (net != null)
 			return net;
-		return new EDIFNet(name, parentCell);
+		return new EDIFNet(name, parent_cell);
 	}
 
-	private void connectAll(DirectiveHeader head, ArgsContainer args) {
+	/**
+	 * Use synth_netlist loaded in
+	 * {@link #init(Design, DirectiveHeader, ArgsContainer) init} as template to
+	 * connect module instances together and to top level ports.
+	 * 
+	 * @param args Arguments from the command line.
+	 */
+	private void connectAll(ArgsContainer args) {
 		if (synth_netlist == null) {
 			printIfVerbose("\nNo top level synth loaded. Can't make any connections.", args.verbose());
 			return;
 		}
-
 		EDIFCell top = design.getNetlist().getTopCell();
 		EDIFCell synth_top = synth_netlist.getCell(top.getName());
 
@@ -526,10 +627,15 @@ public class Merger {
 
 	/**
 	 * Places and routes a dcp and writes the routed design back to the same file
-	 * location.
+	 * location using vivado tcl.
+	 * 
+	 * @param inout_file File where input dcp is located and where final design will
+	 *                   be written.
+	 * @param head       Data common to the sibling directives that were merged to
+	 *                   build this design.
+	 * @param args       Arguments from the command line.
 	 */
 	public void placeAndRoute(File inout_file, DirectiveHeader head, ArgsContainer args) {
-		// TODO lock P&R
 		lockPlacement(design);
 		lockRouting(design);
 
@@ -571,6 +677,13 @@ public class Merger {
 			writeCheckpoint(new File(filename));
 	}
 
+	/**
+	 * Lock placement of a design.
+	 * <p>
+	 * From {@link com.xilinx.rapidwright.debug.ILAInserter#main(String[])}
+	 * 
+	 * @param d Design whose placement is to be locked.
+	 */
 	public static void lockPlacement(Design d) {
 		for (Cell c : d.getCells()) {
 			c.setBELFixed(true);
@@ -578,6 +691,13 @@ public class Merger {
 		}
 	}
 
+	/**
+	 * Lock routing of a design.
+	 * <p>
+	 * From {@link com.xilinx.rapidwright.debug.ILAInserter#main(String[])}
+	 * 
+	 * @param d Design whose routing is to be locked.
+	 */
 	public static void lockRouting(Design d) {
 		for (Net n : d.getNets()) {
 			for (PIP p : n.getPIPs()) {
@@ -587,11 +707,14 @@ public class Merger {
 	}
 
 	/**
-	 * Modified from EDIFNetlist.migrate_cellAndSubCells()
+	 * Migrates cell and all it's descendant cells from the library of some other
+	 * design to the library of this design's netlist.
+	 * <p>
+	 * Modified from {@link EDIFNetlist#migrateCellAndSubCells(EDIFCell)} This
+	 * should do the same except that it replaces blackboxes in the work library.
 	 * 
-	 * This should do the same except that it replaces blackboxes.
-	 * 
-	 * @param cell Cell to merge (along with its subcells) into design.getNetlist().
+	 * @param cell Cell from other design's netlist to merge (along with its
+	 *             subcells) into this design's netlist.
 	 */
 	private void myMigrateCellAndSubCells(EDIFCell cell) {
 		EDIFNetlist netlist = design.getNetlist();
@@ -737,7 +860,7 @@ public class Merger {
 	 * instance to source port net.
 	 */
 	@Deprecated
-	@SuppressWarnings("unused")
+	// @SuppressWarnings("unused")
 	private void edifConnect(EDIFCell parent, EDIFCellInst source_ci, EDIFPort source_port, String source_pi_name,
 			EDIFCellInst sink_ci, EDIFPort sink_port, String sink_pi_name) {
 

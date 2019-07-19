@@ -1,6 +1,11 @@
 
-package worker;
+package main.worker;
 
+/**
+ * @deprecated Only used by other depricated functions and classes.
+ * @see Connections
+ * @see worker.Merger#connectAll(ModuleInst mi, Connections conns)
+ */
 class MyPort {
 	public static enum Type {
 		WIRE, BUS, AXI
