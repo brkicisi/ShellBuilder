@@ -72,6 +72,13 @@ public class ArgsContainer {
 	}
 
 	/**
+	 * True if refresh was part of the command line args.
+	 */
+	public boolean refresh() {
+		return arg_map.containsKey(Args.Tag.REFRESH.toString());
+	}
+
+	/**
 	 * Generate options in format for {@link main.tcl.TCLScript TCLScript}.
 	 * <p>
 	 * Note only pass verbose to tcl if extra-verbose is selected.

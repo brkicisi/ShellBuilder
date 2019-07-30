@@ -146,6 +146,43 @@ public class Merger {
 	}
 
 	/**
+	 * TODO remove this
+	 */
+	public void merge(Directive directive, Merger sub_merge, ArgsContainer args) {
+		Design d = sub_merge.design;
+		d.getNetlist().getTopCellInst();
+		d.getNetlist().renameNetlistAndTopCell(d.getName());
+		Module mod = new Module(d);
+
+		String mod_name = FileTools.removeFileExtension(directive.getDCP().getName());
+		mod.setName(mod_name);
+		// TODO pblock string may be null
+		mod.setPBlock(directive.getPBlockStr());
+		if (design == null) {
+			if (directive.getHeader().getModuleName() != null)
+				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
+						directive.getHeader(), args);
+			else
+				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
+		}
+		// intended to remove black box (will end up removing any previous
+		// implementation of the cell)
+		// design.getNetlist().getWorkLibrary().removeCell(mod.getNetlist().getTopCell().getName());
+		// design.getNetlist().migrateCellAndSubCells(mod.getNetlist().getTopCell());
+		myMigrateCellAndSubCells(mod.getNetlist().getTopCell());
+
+		if (design == null) {
+			if (directive.getHeader().getModuleName() != null)
+				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
+						directive.getHeader(), args);
+			else
+				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
+		}
+		insertOOC(mod, directive);
+		connectAll(args);
+	}
+
+	/**
 	 * Find and load a {@link Module} from cache - place & route and store in cache
 	 * if not already in cache.
 	 * <p>
@@ -181,7 +218,7 @@ public class Merger {
 		// Try to find in cache. If is in the cache and is newer than all it's
 		// dependancies, then use it.
 		if (!directive.isRefresh()) {
-			File cached_dcp = findModuleInCache(directive, args);
+			File cached_dcp = findModuleInCache(directive, args, false);
 			if (cached_dcp != null) {
 				// TODO reuse module if already loaded?
 				// how to know if same implementation of module?
@@ -214,7 +251,8 @@ public class Merger {
 		String mod_name = FileTools.removeFileExtension(directive.getDCP().getName());
 		mod.setName(mod_name);
 		// TODO pblock string may be null
-		mod.setPBlock(directive.getPBlockStr());
+		if (directive.getPBlockStr() != null)
+			mod.setPBlock(directive.getPBlockStr());
 		if (design == null) {
 			if (directive.getHeader().getModuleName() != null)
 				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
@@ -261,28 +299,38 @@ public class Merger {
 	 * '{@literal <rect_2>}&nbsp;{@literal <rect_1>}' even though they are the same
 	 * in tcl.
 	 * 
-	 * @param directive Merge or build directive to search for in cache.
-	 * @param args      Arguments from command line.
+	 * @param directive      Merge or build directive to search for in cache.
+	 * @param args           Arguments from command line.
+	 * @param ignore_refresh If true does not check whether submodules have
+	 *                       requested a refresh. If false returns null if any
+	 *                       submodule requested a refresh.
 	 * @return File if found in cache, matches dependancies and pblock, and up to
 	 *         date. Null otherwise.
 	 */
-	public static File findModuleInCache(Directive directive, ArgsContainer args) {
-		return findModuleInCache(directive, args, new DependancyMeta.DepSet());
+	public static File findModuleInCache(Directive directive, ArgsContainer args, boolean ignore_refresh) {
+		return findModuleInCache(directive, args, new DependancyMeta.DepSet(), ignore_refresh);
 	}
 
 	/**
 	 * Searches cache for a design assuming visited designs exist and are up to
 	 * date.
+	 * <p>
+	 * Returns null if directive is a build and any of the subdirectives are to be
+	 * refreshed.
 	 * 
-	 * @param directive Merge or build directive to search for in cache.
-	 * @param args      Arguments from command line.
-	 * @param visited   already visited modules.
+	 * @param directive      Merge or build directive to search for in cache.
+	 * @param args           Arguments from command line.
+	 * @param visited        Already visited modules.
+	 * @param ignore_refresh If true does not check whether submodules have
+	 *                       requested a refresh. If false returns null if any
+	 *                       submodule requested a refresh.
 	 * @return File if found in cache, matches dependancies and pblock, and up to
 	 *         date. Null otherwise.
 	 * 
 	 * @see #findModuleInCache(Directive, ArgsContainer)
 	 */
-	public static File findModuleInCache(Directive directive, ArgsContainer args, DependancyMeta.DepSet visited) {
+	public static File findModuleInCache(Directive directive, ArgsContainer args, DependancyMeta.DepSet visited,
+			boolean ignore_refresh) {
 		if (visited == null)
 			visited = new DependancyMeta.DepSet();
 
@@ -304,7 +352,7 @@ public class Merger {
 		String pblock = directive.getPBlockStr();
 		File impl_dir;
 		if (pblock != null) {
-			impl_dir = new File(mod_dir, pblock.replace(' ', '+'));
+			impl_dir = new File(mod_dir, getPblockPath(pblock));
 		} else {
 			printIfVerbose("\nNo pblock specified for module '" + module_name + "'.", args.verbose());
 			impl_dir = mod_dir;
@@ -352,13 +400,23 @@ public class Merger {
 
 		// for each subbuilder directive
 		if (directive.isSubBuilder()) {
+			if (directive.isRefresh() && !ignore_refresh) {
+				printIfVerbose("Module " + module_name + " requested a refresh.", args.verbose());
+				return null;
+			}
+
 			for (Directive dir : directive.getSubBuilder().getDirectives()) {
 				if (dir.isOnlyWires())
 					continue;
+				// if sub module requested refresh don't use cached module
+				if ((dir.isRefresh() || dir.getHeader().isRefresh()) && !ignore_refresh) {
+					printIfVerbose("Module " + getModuleName(dir, args) + " requested a refresh.", args.verbose());
+					return null;
+				}
 				String sub_mod = getModuleName(dir, args);
 				String sub_pblock = (dir.getPBlockStr() == null) ? "" : dir.getPBlockStr();
 
-				String sub_pblock_plus = sub_pblock.replace(" ", "+");
+				String sub_pblock_plus = getPblockPath(sub_pblock);
 				if (!dep_set.contains(sub_mod, sub_pblock_plus)) {
 					printIfVerbose("\nModule '" + sub_mod + "' with pblock '" + sub_pblock
 							+ "' was not found the dependancies of " + module_name + ".", args.verbose());
@@ -370,7 +428,7 @@ public class Merger {
 					continue;
 				visited.put(sub_mod, sub_pblock);
 
-				File sub = findModuleInCache(dir, args, visited);
+				File sub = findModuleInCache(dir, args, visited, ignore_refresh);
 				if (sub == null)
 					return null;
 
@@ -404,6 +462,10 @@ public class Merger {
 	 * @return String where output was written.
 	 */
 	private static String placeRouteOOC(Directive directive, ArgsContainer args) {
+		// if (directive.getInstName().equals("clk_wiz_1")) { // TODO remove this 'if'
+		// return findModuleInCache(directive, args).getAbsolutePath();
+		// }
+
 		String module_name = getModuleName(directive, args);
 		if (module_name == null)
 			return null;
@@ -419,11 +481,8 @@ public class Merger {
 			cache_impl_dir = new File(directive.getIII(), MODULE_CACHE + "/" + module_name);
 		else
 			cache_impl_dir = new File(directive.getIII(),
-					MODULE_CACHE + "/" + module_name + "/" + directive.getPBlockStr().replace(' ', '+'));
+					MODULE_CACHE + "/" + module_name + "/" + getPblockPath(directive.getPBlockStr()));
 		// create cache folder in iii
-		// File cache_impl_dir = new File(directive.getIII(),
-		// MODULE_CACHE + "/" + module_name + "/" + directive.getPBlockStr().replace('
-		// ', '+'));
 		if (!cache_impl_dir.isDirectory())
 			cache_impl_dir.mkdirs();
 
@@ -435,6 +494,25 @@ public class Merger {
 		String output_dcp = cache_impl_dir.getAbsolutePath() + "/" + module_name + ".dcp";
 		String tcl_script_file = directive.getIII().getAbsolutePath() + "/pblock_place_route_step.tcl";
 		TCLScript script = new TCLScript(input_dcp, output_dcp, options, tcl_script_file);
+
+		// TODO do I want to add constraints to dcp's here?
+		// TODO even if I do, fix it up
+		// File src_constrs = new File(directive.getHeader().getIII(),
+		// "moduleCache/design_2_clk_wiz_1_1/constraints.xdc");
+		// // File src_constrs = new
+		// File(directive.getHeader().getIII().getParentFile(),
+		// // "tut2_proj1_constrs_1_no_flags.xdc");
+		// // DesignUtils.copyConstrsFileIntoDCP(src_constrs, new File(output_dcp),
+		// directive.getHeader().isVerbose(),
+		// // directive.getHeader().getIII());
+		// // script.addCustomCmd("write_xdc -cell " + hier_cell_name + " -no_fixed_only
+		// " + xdc_file.getAbsolutePath());
+		File src_constrs = new File(cache_impl_dir, XDCWriter.CONSTRAINTS_FILE);
+		if (!(directive.isSubBuilder() && directive.getSubBuilder().getHeader().isBufferedInputs()))
+			script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged -mode out_of_context",
+					src_constrs.getAbsolutePath());
+		else
+			script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged", src_constrs.getAbsolutePath());
 
 		if (directive.getPBlockStr() != null) {
 			String pblock_name = "[get_property TOP [current_design ]]" + "_pblock";
@@ -463,7 +541,7 @@ public class Merger {
 	 * @param args      Arguments from command line.
 	 * @return Name of the module specified in directive.
 	 */
-	private static String getModuleName(Directive directive, ArgsContainer args) {
+	public static String getModuleName(Directive directive, ArgsContainer args) {
 		String module_name = null;
 		if (directive.isSubBuilder())
 			module_name = directive.getSubBuilder().getHeader().getModuleName();
@@ -498,6 +576,15 @@ public class Merger {
 		ModuleInst mi = null;
 		// PBlock block = new PBlock(device, directive.getPBlockStr());
 
+		// if (directive.getInstName().equals("clk_wiz_1")) { // TODO remove this 'if'
+		// String mi_name = directive.getInstName();
+		// // TODO set mi name if duplicate
+		// if (mi_name == null)
+		// mi_name = mod.getName() + "_i";
+		// mi = design.createModuleInst(mi_name, mod);
+		// mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
+		// return mi;
+		// }
 		// TODO better auto placer
 
 		Site anchor_site = null, tmp_site = null;
@@ -505,25 +592,36 @@ public class Merger {
 			if (anchor_site != null)
 				break;
 			for (int y = 0; y < 200; y++) {
-				String site_str = "SLICE_X" + x + "Y" + y;
-				tmp_site = device.getSite(site_str);
-				if (mod.isValidPlacement(tmp_site, device, design)) {
-					anchor_site = tmp_site;
-					break;
+				try {
+					String site_str = "SLICE_X" + x + "Y" + y;
+					tmp_site = device.getSite(site_str);
+					if (mod.isValidPlacement(tmp_site, device, design)) {
+						anchor_site = tmp_site;
+						break;
+					}
+				} catch (NullPointerException npe) {
 				}
 			}
 		}
 
+		// BlockPlacer2 placer = new BlockPlacer2();
+		// placer.placeModuleNear(...);
+		// placer.placeDesign(design, debugFlow);
+
+		String mi_name = directive.getInstName();
+		// TODO set mi name if duplicate
+		if (mi_name == null)
+			mi_name = mod.getName() + "_i";
+
 		if (anchor_site != null && mod.isValidPlacement(anchor_site, device, design)) {
-			String mi_name = directive.getInstName();
-			// TODO set mi name if duplicate
-			if (mi_name == null)
-				mi_name = mod.getName() + "_i";
 			mi = design.createModuleInst(mi_name, mod);
 			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
 			MessageGenerator
 					.briefMessage("Placing module instance '" + mi.getName() + "' at '" + anchor_site.getName() + "'.");
 			mi.place(anchor_site);
+		} else {
+			MessageGenerator
+					.briefErrorAndExit("\nCould not find any where to place module instance '" + mi_name + "'.");
 		}
 		// if (!mi.placeMINearTile(block.getBottomLeftTile(), SiteTypeEnum.SLICEL)
 		// && !mi.placeMINearTile(block.getBottomLeftTile(), SiteTypeEnum.SLICEM)) {
@@ -549,6 +647,7 @@ public class Merger {
 		// mi.place(anchor_site);
 		// }
 
+		// TODO only do this if anchor_site != 0 ?
 		if (directive.isHandPlacer())
 			HandPlacer.openDesign(design);
 		return mi;
@@ -636,14 +735,20 @@ public class Merger {
 	 * @param args       Arguments from the command line.
 	 */
 	public void placeAndRoute(File inout_file, DirectiveHeader head, ArgsContainer args) {
-		lockPlacement(design);
-		lockRouting(design);
-
 		String options = (args == null) ? "f" : args.options("f");
 		String inout_dcp = inout_file.getAbsolutePath();
 		String tcl_script_file = head.getIII().getAbsolutePath() + "/pblock_place_route_step.tcl";
 
 		TCLScript script = new TCLScript(inout_dcp, inout_dcp, options, tcl_script_file);
+
+		File cache_impl_dir = inout_file.getParentFile();
+		File src_constrs = new File(cache_impl_dir, XDCWriter.CONSTRAINTS_FILE);
+		if (!head.isBufferedInputs())
+			script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged -mode out_of_context",
+					src_constrs.getAbsolutePath());
+		else
+			script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged", src_constrs.getAbsolutePath());
+
 		// todo opt?
 		// script.add(TCLEnum.OPT);
 		script.add(TCLEnum.PLACE);
@@ -668,8 +773,13 @@ public class Merger {
 
 	public void writeCheckpoint(File dcp_file) {
 		dcp_file.getParentFile().mkdirs();
-		if (design != null)
+		if (design != null) {
+			// TODO lock Placement and Routing
+			lockPlacement(design);
+			lockRouting(design);
+
 			design.writeCheckpoint(dcp_file.getAbsolutePath());
+		}
 	}
 
 	public void writeCheckpoint(String filename) {
@@ -704,6 +814,17 @@ public class Merger {
 				p.setIsPIPFixed(true);
 			}
 		}
+	}
+
+	/**
+	 * Transform pblock path into a path that is acceptable to vivado but is still
+	 * human readable as well.
+	 * 
+	 * @param pblock PBlock string to transform.
+	 * @return A human and vivado readable representation of pblock.
+	 */
+	public static String getPblockPath(String pblock) {
+		return pblock == null ? "" : pblock.replaceAll("_", "").replaceAll(":", "_").replaceAll(" ", "__");
 	}
 
 	/**

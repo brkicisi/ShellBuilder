@@ -3,6 +3,7 @@ package main.tcl;
 import main.tcl.TCLCommand;
 
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.MessageGenerator;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -50,11 +51,12 @@ public class TCLScript {
 		this.options = (options == null) ? "" : options;
 
 		tcl_script = new ArrayList<>();
-		if (options.contains("v")) // if verbose -> don't set quiet
+		if (options != null && options.contains("v")) // if verbose -> don't set quiet
 			tcl_script.add(new TCLCommand(TCLEnum.SOURCE_RW, null));
 		else
 			tcl_script.add(new TCLCommand(TCLEnum.SOURCE_RW, "q", null));
-		tcl_script.add(new TCLCommand(TCLEnum.OPEN_DCP, options, input_dcp));
+		if (input_dcp != null)
+			tcl_script.add(new TCLCommand(TCLEnum.OPEN_DCP, options, input_dcp));
 
 		if (cmds != null)
 			for (TCLEnum te : cmds)
@@ -81,11 +83,44 @@ public class TCLScript {
 	}
 
 	/**
-	 * Add a single tcl command to the script. The command is inserted as a single
-	 * line exactly as given. This function does not change the commands Vivado
-	 * understands, it simply allows the user to use commands that aren't explicitly
-	 * supported in TCLEnum. No error check is done to ensure you have input a valid
-	 * tcl command here.
+	 * Add a single command to the script using given options plus user specified
+	 * custom options.
+	 * <p>
+	 * This function does not change the options Vivado understands, it simply
+	 * allows the user to use options that aren't explicitly supported in TCLEnum.
+	 * No error check is done to ensure you have input a valid tcl command here.
+	 * 
+	 * @param te          Type of command to add.
+	 * @param opts        Options to use.
+	 * @param custom_opts Custom options to use exactly as given.
+	 */
+	public void add(TCLEnum te, String opts, String custom_opts) {
+		tcl_script.add(new TCLCommand(te, opts, custom_opts, output_file));
+	}
+
+	/**
+	 * Add a single command to the script using given options plus user specified
+	 * custom options and file.
+	 * <p>
+	 * This function does not change the options Vivado understands, it simply
+	 * allows the user to use options that aren't explicitly supported in TCLEnum.
+	 * No error check is done to ensure you have input a valid tcl command here.
+	 * 
+	 * @param te          Type of command to add.
+	 * @param opts        Options to use.
+	 * @param custom_opts Custom options to use exactly as given.
+	 * @param filename    File to read/write from/to with the command
+	 */
+	public void add(TCLEnum te, String opts, String custom_opts, String filename) {
+		tcl_script.add(new TCLCommand(te, opts, custom_opts, filename));
+	}
+
+	/**
+	 * Add a single tcl command to the script as a single line exactly as given.
+	 * <p>
+	 * This function does not change the commands Vivado understands, it simply
+	 * allows the user to use commands that aren't explicitly supported in TCLEnum.
+	 * No error check is done to ensure you have input a valid tcl command here.
 	 * 
 	 * @param custom_cmd Custom tcl command to insert.
 	 */
@@ -109,15 +144,31 @@ public class TCLScript {
 
 	/**
 	 * Execute tcl script.
+	 * <p>
+	 * Throw an error if the process does not return 0 (success).
 	 * 
-	 * @return Success.
+	 * @return Null upon error. Else same return as from
+	 *         {@link FileTools#runCommand}.
 	 */
-	public boolean run() {
+	public Integer run() {
+		return run(true);
+	}
+
+	/**
+	 * Execute tcl script.
+	 * 
+	 * @param throw_error Throw an error if the process does not return 0 (success).
+	 * @return Null upon error. Else same return as from
+	 *         {@link FileTools#runCommand}.
+	 */
+	public Integer run(boolean throw_error) {
 		boolean wrote = write();
 		if (!wrote)
-			return false;
+			return null;
 
-		FileTools.runCommand(run_vivado + " " + tcl_file.getAbsolutePath(), true);
-		return true;
+		Integer ret = FileTools.runCommand(run_vivado + " " + tcl_file.getAbsolutePath(), true);
+		if (throw_error && ret != 0)
+			MessageGenerator.briefErrorAndExit("Tcl script returned error code " + ret + ".");
+		return ret;
 	}
 }

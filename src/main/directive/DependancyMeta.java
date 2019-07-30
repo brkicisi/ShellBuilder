@@ -211,7 +211,8 @@ public class DependancyMeta {
 		if (directive.isSubBuilder()) {
 			for (Directive dir : directive.getSubBuilder().getDirectives())
 				if (!dir.isOnlyWires())
-					dependancies.add(Merger.findModuleInCache(dir, args));
+
+				dependancies.add(Merger.findModuleInCache(dir, args, true));
 		} else
 			dependancies.add(directive.getDCP());
 
@@ -250,9 +251,9 @@ public class DependancyMeta {
 		if (iii_dir != null || ooc_dir != null) {
 			lines.add("\t<" + header.key + ">");
 			if (iii_dir != null)
-				lines.add("\t\t<" + makeReducedFileLine(HEADER.iii_dir, iii_dir, null, null));
+				lines.add("\t\t" + makeReducedFileLine(HEADER.iii_dir, iii_dir, null, null));
 			if (ooc_dir != null)
-				lines.add("\t\t<" + makeReducedFileLine(HEADER.ooc_dir, iii_dir, null, null));
+				lines.add("\t\t" + makeReducedFileLine(HEADER.ooc_dir, ooc_dir, null, null));
 			if (synth_1 != null)
 				lines.add("\t\t" + makeReducedFileLine(HEADER.synth_1, synth_1, iii_dir, ooc_dir));
 			if (initial != null)

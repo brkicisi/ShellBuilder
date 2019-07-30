@@ -12,8 +12,10 @@ import main.parser.Args;
 import main.parser.ArgsContainer;
 import main.util.DesignUtils;
 import main.worker.Merger;
+import main.worker.XDCWriter;
 import main.directive.*;
 import main.worker.FileSys;
+import main.worker.ILAAdder;
 
 import java.io.File;
 import java.io.IOException;
@@ -73,8 +75,9 @@ public class ShellBuilder {
 	 */
 	private void runDirective(Directive directive, Merger merger) {
 		if (directive.isSubBuilder()) {
+			// TODO uncomment this
 			// check for cached hierarchial solutions
-			File cached_dcp = Merger.findModuleInCache(directive, args);
+			File cached_dcp = Merger.findModuleInCache(directive, args, false);
 			if (cached_dcp != null) {
 				directive.setDCP(cached_dcp);
 			} else {
@@ -82,6 +85,17 @@ public class ShellBuilder {
 				directive.setDCP(sub_merge.getFinalDCP());
 			}
 			merger.merge(directive, args);
+
+			// TODO remove this
+			// File cached_dcp = Merger.findModuleInCache(directive, args);
+			// if (cached_dcp != null) {
+			// directive.setDCP(cached_dcp);
+			// merger.merge(directive, args);
+			// } else {
+			// Merger sub_merge = runBuilder(directive.getSubBuilder());
+			// directive.setDCP(sub_merge.getFinalDCP());
+			// merger.merge(directive, sub_merge, args);
+			// }
 
 		} else if (directive.isMerge()) {
 			merger.merge(directive, args);
@@ -136,7 +150,21 @@ public class ShellBuilder {
 				Merger.MODULE_CACHE + "/" + head.getModuleName() + "/" + head.getModuleName() + ".dcp");
 		merger.setFinalDCP(out_dcp);
 		merger.writeCheckpoint(out_dcp);
-		merger.placeAndRoute(out_dcp, directive_builder.getHeader(), args);
+		// TODO DesignUtils.copyConstrsFileIntoDCP(src_constrs, dest_dcp, verbose, dir)
+		// TODO remove this 'if'
+		// if (out_dcp.getName().startsWith("design_2_wrapper"))
+		// DesignUtils.copyConstrsFileIntoDCP(
+		// new File(head.getIII().getParentFile(), "tut2_proj1_constrs_1_no_flags.xdc"),
+		// // new
+		// //
+		// File("/thesis0/pc2019/Igi/shell/pieces/tut2/project_1/project_1.srcs/constrs_1/imports/new/microblaze.xdc"),
+		// new File(head.getIII(), "moduleCache/design_2_wrapper/design_2_wrapper.dcp"),
+		// head.isVerbose(), head.getIII());
+
+		// TODO remove this 'if'
+		// if (out_dcp.getName().startsWith("design_1_wrapper"))
+		// if (head.getParent() == null) // ! only run if top level module?
+			merger.placeAndRoute(out_dcp, head, args); // keep this
 
 		// Get dcp of last directive if it was a write
 		File write_dcp = null;
@@ -159,9 +187,11 @@ public class ShellBuilder {
 				f = new File(write_dcp.getParentFile(), write_dcp.getName().replace(".dcp", ".edf"));
 				to = Paths.get(f.getAbsolutePath());
 				Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
-				printIfVerbose("\nCopied checkpoint and edif from cache to '" + write_dcp.getParent() + "'");
+				printIfVerbose(
+						"\nCopied checkpoint and edif from cache to '" + write_dcp.getAbsolutePath() + "' (/.edf)");
 			} catch (IOException ioe) {
-				printIfVerbose("Failed to copy checkpoint and edif from cache to '" + write_dcp.getParent() + "'");
+				printIfVerbose("Failed to copy checkpoint and edif from cache to '" + write_dcp.getAbsolutePath()
+						+ "' (/.edf)");
 			}
 		}
 
@@ -169,8 +199,8 @@ public class ShellBuilder {
 	}
 
 	/**
-	 * Execute all {@link main.directive.DirectiveWriter.TemplateBuilder template builders} in this
-	 * directive_builder and in all it's descendant builders.
+	 * Execute all {@link main.directive.DirectiveWriter.TemplateBuilder template
+	 * builders} in this directive_builder and in all it's descendant builders.
 	 * 
 	 * @param directive_builder Top directive builder.
 	 */
@@ -186,8 +216,8 @@ public class ShellBuilder {
 	 * Highest level orchestrator.
 	 * <p>
 	 * Parses command line args. Parses xml_directives file input at command line.
-	 * Run all {@link main.directive.DirectiveWriter.TemplateBuilder template builders}. Run top
-	 * {@link DirectiveBuilder directive builder}.
+	 * Run all {@link main.directive.DirectiveWriter.TemplateBuilder template
+	 * builders}. Run top {@link DirectiveBuilder directive builder}.
 	 * 
 	 * @param cmd_line_args Command line arguments.
 	 */
@@ -195,9 +225,25 @@ public class ShellBuilder {
 		args = new ArgsContainer(cmd_line_args);
 		FileSys fsys = new FileSys(args.verbose());
 		File xml_directives = fsys.getExistingFile(args.getOneArg(Args.Tag.XML_DIRECTIVES), true);
-
 		DirectiveBuilder directive_builder = new DirectiveBuilder();
 		directive_builder.parse(xml_directives, args.verbose());
+		if (args.refresh())
+			directive_builder.getHeader().setRefresh(true);
+
+		// TODO remove this test
+		// File input_dcp = new
+		// File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
+		// "xml_final_all_green_placement.dcp");
+		// File output_dcp = new
+		// File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
+		// "tut2_with_ila.dcp");
+		// ILAAdder.testAddILA(input_dcp, output_dcp, directive_builder.getHeader(),
+		// args);
+		// TODO XDCWriter if any don't exist
+		XDCWriter xdc_writer = new XDCWriter(args, true);
+		for (Directive dir : directive_builder.getDirectives())
+			xdc_writer.writeAllHierXDC(dir);
+
 		runTemplateBuilder(directive_builder);
 		if (!directive_builder.getDirectives().isEmpty())
 			runBuilder(directive_builder);

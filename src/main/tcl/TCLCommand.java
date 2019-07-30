@@ -9,6 +9,7 @@ import com.xilinx.rapidwright.util.FileTools;
  */
 class TCLCommand {
 	TCLEnum tcl_cmd = null;
+	String custom_options = null;
 	String options = null;
 	String filename = null;
 	String custom_cmd = null;
@@ -18,7 +19,12 @@ class TCLCommand {
 	}
 
 	TCLCommand(TCLEnum tcl_cmd, String options, String filename) {
+		this(tcl_cmd, options, null, filename);
+	}
+
+	TCLCommand(TCLEnum tcl_cmd, String options, String custom_opts, String filename) {
 		this.tcl_cmd = tcl_cmd;
+		this.custom_options = custom_opts;
 		this.options = options;
 		if (tcl_cmd.ext() != null)
 			this.filename = FileTools.removeFileExtension(filename) + tcl_cmd.ext();
@@ -38,8 +44,9 @@ class TCLCommand {
 		if (custom_cmd != null)
 			return custom_cmd;
 
+		String custom_opts = (custom_options == null ? "" : " " + custom_options);
 		if (filename == null || tcl_cmd.ext() == null)
-			return tcl_cmd.cmd(options);
-		return tcl_cmd.cmd(options) + " " + filename;
+			return tcl_cmd.cmd(options) + custom_opts;
+		return tcl_cmd.cmd(options) + custom_opts + " " + filename;
 	}
 }

@@ -10,7 +10,8 @@ import java.io.File;
 public enum TCLEnum {
     SOURCE_RW("source " + FileTools.getRapidWrightPath() + File.separator + FileTools.TCL_FOLDER_NAME + File.separator
             + "rapidwright.tcl", "qv", null),
-    OPEN_DCP("open_checkpoint", "qv", ".dcp"), WRITE_DCP("write_checkpoint", "qvf", ".dcp"),
+	OPEN_DCP("open_checkpoint", "qv", ".dcp"), WRITE_DCP("write_checkpoint", "qvf", ".dcp"),
+	READ_XDC("read_xdc", "qv", ".xdc"), WRITE_XDC("write_xdc", "qvf", ".xdc"),
     OPT("opt_design", "qv", null), PLACE("place_design", "qv", null), ROUTE("route_design", "qv", null),
     WRITE_EDIF("write_edif", "qvf", ".edf"), WRITE_LTX("write_debug_probes", "qvf", ".ltx"),
     WRITE_BITSTREAM("write_bitstream", "qvf", ".bit");

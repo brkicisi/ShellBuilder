@@ -103,6 +103,10 @@ public class DirectiveHeader {
 		this.verbose = verbose;
 	}
 
+	public void setRefresh(boolean refresh) {
+		this.refresh = verbose;
+	}
+
 	/**
 	 * @return iii dir from this header; else from parent; else null.
 	 */

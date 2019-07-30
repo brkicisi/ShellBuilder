@@ -12,8 +12,6 @@ import java.util.Queue;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-
-
 /**
  * Wrapper to parse and store a set of sibling {@link Directive direcitves} and
  * a {@link DirectiveHeader header}.

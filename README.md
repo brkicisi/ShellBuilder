@@ -52,7 +52,7 @@ These are defined in the xml header using their name as the [tag](#Tags). If def
 	<dcp>#iii/relative/path/to/iii_dir/checkpoint.dcp</dcp>
 	```
 
-*Note*: You cannot use either of these methods within header.
+*Note*: You can use either of these methods only when the tag has attribute *loc*.
 
 **Important**: None of these three directories must be specified in the xml header.
 
@@ -71,123 +71,33 @@ The following are the tags that ShellBuilder checks. If tags are repeated within
 The exception to the above rule is `<inst>` which will be repeated many times (once for each instruction instance).
 
 <!-- markdownlint-disable MD033 -->
-<table><!--  <table style="width:100%"> -->
-	<tr>
-		<th>Index</th>
-    	<th>Tag</th>
-	    <th>Children</th>
-	    <th>Attributes</th>
-	    <th>Description</th>
-	</tr>
-	<tr>
-		<td>1</td>
-		<td>header</td>
-		<td>1<strong>.</strong>?</td>
-		<td></td>
-		<td>Parent to metadata which is common for the whole build.</td>
-  	</tr>
-  	<tr>
-		<td>1.1</td>
-    	<td>iii_dir</td>
-		<td></td>
-		<td></td>
-		<td>Working directory to save intermediate designs as well as temporary files.</td>
-  	</tr>
-	<tr>
-		<td>1.2</td>
-    	<td>ooc_dir</td>
-		<td></td>
-		<td></td>
-		<td>Directory containing ooc dcps.</td>
-  	</tr>
-	<tr>
-		<td>1.3</td>
-    	<td>out_dir</td>
-		<td></td>
-		<td></td>
-		<td>Output directory.</td>
-  	</tr>
-	<tr>
-		<td>1.4</td>
-    	<td>refresh</td>
-		<td></td>
-		<td></td>
-		<td>Place and route all modules ignoring and overwriting cached results.</td>
-  	</tr>
-	<tr>
-		<td>1.5</td>
-    	<td>module_name</td>
-		<td></td>
-		<td></td>
-		<td>Sets name of module to this if initializing a new design. Cannot contain spaces (will be replaced with underscores). Has no effect if starting with a base design.</td>
-  	</tr>
-	<tr>
-		<td>2</td>
-    	<td>inst</td>
-		<td>2<strong>.</strong>?</td>
-		<td>type</td>
-		<td>Instance of an instruction of the given type.</td>
-  	</tr>
-	<tr>
-		<td>2.1</td>
-    	<td>dcp</td>
-		<td></td>
-		<td>loc</td>
-		<td>Specify location of an input (merge) or output (write) dcp file.</td>
-  	</tr>
-	<tr>
-		<td>2.2</td>
-    	<td>pblock</td>
-		<td></td>
-		<td></td>
-		<td>String representing pblock to merge current dcp into.</td>
-  	</tr>
-	<tr>
-		<td>2.3</td>
-    	<td>iname</td>
-		<td></td>
-		<td></td>
-		<td>Name to give this instance of the dcp module.</td>
-  	</tr>
-	<tr>
-		<td>2.4</td>
-    	<td>force</td>
-		<td></td>
-		<td></td>
-		<td>Force overwrite of file with this name for this write only.</td>
-  	</tr>
-	<tr>
-		<td>2.5</td>
-    	<td>refresh</td>
-		<td></td>
-		<td></td>
-		<td>Place and route this module ignoring and overwriting cached results.</td>
-  	</tr>
-	<tr>
-		<td>2.6</td>
-    	<td>hand_placer</td>
-		<td></td>
-		<td></td>
-		<td>Open RapidWright's HandPlacer to allow user to interactively place this module.</td>
-  	</tr>
-</table>
-<table>
-	<tr>
-		<th>Attribute</th>
-		<th>Recognized Values</th>
-		<th>Description</th>
-	</tr>
-	<tr>
-    	<td>loc</td>
-		<td>iii, ooc, out</td>
-		<td>Specify root to resolve filename agianst.</td>
-  	</tr>
-	<tr>
-    	<td>type</td>
-		<td>merge, write, init</td>
-		<td>Type of operation to perform. Merge adds given dcp to design inside the given pblock. Write saves the current state to a dcp. Init initializes other designs to merge with given base design. Init must only appear in first <em>inst</em> tag.</td>
-  	</tr>
-</table>
+| Index | Tag           | Children  | Attributes | Description                                                                                                                                                                       |
+| :---- | :------------ | :-------- | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | header        | 1.?       |            | Parent to metadata which is common for the whole build.                                                                                                                           |
+| 1.1   | iii_dir       |           |            | Working directory to save intermediate designs as well as temporary files.                                                                                                        |
+| 1.2   | ooc_dir       |           |            | Directory containing ooc dcps.                                                                                                                                                    |
+| 1.3   | out_dir       |           |            | Output directory.                                                                                                                                                                 |
+| 1.4   | initial       |           | loc (opt)  | Use this as the base design to the Merger. Add all descendant modules to this design.                                                                                             |
+| 1.5   | synth         |           | loc (opt)  |                                                                                                                                                                                   |
+| 1.6   | module_name   |           |            | Sets name of hierarchial module constructed by the build instr this header is part of (spaces will be replaced with underscores).                                                 |
+| 1.7   | refresh       |           |            | Place and route all descendant modules ignoring and overwriting cached results.                                                                                                   |
+| 1.8   | hand_placer   |           |            | Open RapidWright's HandPlacer to allow user to interactively place all descendant modules in this build. To finish and accept HandPlacer placement close it using the 'X' button. |
+| 1.9   | buffer_inputs |           |            | Indicates to ShellBuilder that this build should be a normal dcp (not an out of context dcp which is default).                                                                    |
+|       |               |           |            |                                                                                                                                                                                   |
+| 2     | inst          | 1, 2, 2.? | type (req) | Instance of an instruction of the given type.                                                                                                                                     |
+| 2.1   | dcp           |           | loc (opt)  | Specify location of an input (merge) or output (write) dcp file.                                                                                                                  |
+| 2.2   | pblock        |           |            | String representing pblock to merge current design into.                                                                                                                          |
+| 2.3   | iname         |           |            | Name to give this instance of the design module.                                                                                                                                  |
+| 2.4   | force         |           |            | Force overwrite of file with this name for this write only.                                                                                                                       |
+| 2.5   | refresh       |           |            | Place and route this module ignoring and overwriting cached results.                                                                                                              |
+| 2.6   | hand_placer   |           |            | Open RapidWright's HandPlacer to allow user to interactively place this module. To finish and accept HandPlacer placement close it using the 'X' button.                          |
+| 2.7   | only_wires    |           |            | Indicates that this module contains only nets, pins and ports (thus can't be placed & routed ooc). Copy it from design in 1.5.                                                    |
+
+| Attribute | Recognized Values   | Description                                                                                                                                                                                    |
+| :-------- | :------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| loc       | iii, ooc, out       | Specify root to resolve filename agianst.                                                                                                                                                      |
+| type      | merge, write, build | Type of operation to perform. Merge adds given dcp to design inside the given pblock. Build constructs a module from its descendant merges and builds. Write saves the current state to a dcp. |
+
 <!-- markdownlint-enable MD033 -->
 
 You can insert comments basically anywhere just as in standard xml.
@@ -205,42 +115,62 @@ I don't know if the Java library checks for xml version.
 It worked with it either included or not.
 -->
 <root>
-  <header>
-    <name>New-Name</name>
-    <iii_dir>/absolute/path/to/iii_dir</iii_dir>
-    <ooc_dir>relative/path/from/pwd/to/ooc_dir</ooc_dir>
-    <out_dir></out_dir><!-- the output directory is pwd -->
-    <!-- Note: unrecognized_token is not checked for -->
-    <unrecognized_token>Unrecognized tokens are ignored.</unrecognized_token>
-    <iii_dir>Repeated tokens are ignored.</iii_dir>
-    <refresh></refresh>
-  </header>
-  <inst type = "inst">
-    <dcp>your_base_design.dcp</dcp>
-  </inst>
-  <inst type = "merge">
-    <dcp loc = "iii">relative/path/from/iii_dir/ooc_checkpoint_1.dcp</dcp>
-    <pblock>SLICE_X0Y0:SLICE_X3Y5</pblock>
-  </inst>
-  <inst type = "write">
-    <force></force>
-  </inst>
-  <inst type = "merge">
-    <dcp loc = "ooc">../../other/dir/ooc_checkpoint_2.dcp</dcp>
-    <pblock>SLICE_X0Y6:SLICE_X3Y11</pblock>
-	<hand_placer></hand_placer>
-  </inst>
-  <inst type = "merge">
-    <dcp>path/from/pwd/to/dcp/ooc_checkpoint_3.dcp</dcp>
-    <pblock>SLICE_X0Y20:SLICE_X7Y28</pblock>
-  </inst>
-  <inst type = "merge">
-    <dcp>#out/path/relative/to/out_dir/ooc_checkpoint_3.dcp</dcp>
-	<refresh></refresh>
-    <pblock>SLICE_X0Y20:SLICE_X7Y28</pblock>
-  </inst>
-  <inst type = "write">
-    <dcp loc = "out">final.dcp</dcp>
-  </inst>
+    <header>
+        <module_name>wrapper</module_name>
+        <iii_dir>/absolute/path/to/iii_dir</iii_dir>
+        <ooc_dir>relative/path/from/pwd/to/ooc_dir</ooc_dir>
+        <out_dir></out_dir><!-- the output directory is pwd -->
+        <!-- Note: unrecognized_token is not checked for -->
+        <unrecognized_token>Unrecognized tokens are ignored.</unrecognized_token>
+        <iii_dir>Repeated tokens are ignored.</iii_dir>
+        <synth loc = "ooc">synth_1/your_top_level_synth_design.dcp</dcp>
+        <hand_placer/>
+    </header>
+    <inst type = "merge">
+        <dcp loc = "iii">relative/path/from/iii_dir/ooc_checkpoint_1.dcp</dcp>
+        <pblock>SLICE_X0Y0:SLICE_X3Y5</pblock>
+    </inst>
+    <inst type = "write">
+        <dcp>intermediate.dcp</dcp>
+        <force/>
+    </inst>
+    <inst = "build">
+        <header>
+            <module_name>sub_module</module_name>
+            <refresh/>
+        </header>
+        <inst type = "merge">
+            <dcp loc = "ooc">../../other/dir/ooc_checkpoint_2.dcp</dcp>
+            <pblock>SLICE_X0Y6:SLICE_X3Y11</pblock>
+            <hand_placer/>
+        </inst>
+        <inst type = "merge">
+            <dcp>path/from/pwd/to/dcp/ooc_checkpoint_3.dcp</dcp>
+            <pblock>SLICE_X0Y20:SLICE_X7Y28</pblock>
+        </inst>
+    </inst>
+    <inst type = "merge">
+        <dcp>#out/path/relative/to/out_dir/ooc_checkpoint_3.dcp</dcp>
+        <refresh/>
+        <pblock>SLICE_X0Y20:SLICE_X7Y28</pblock>
+    </inst>
+    <inst type = "write">
+        <dcp loc = "out">final.dcp</dcp>
+    </inst>
 </root>
+```
+
+### Bugs and fixes
+
+java.lang.UnsupportedOperationException at ILAInserter#244.
+
+```java
+244: constraints.add(c);
+```
+
+#### Changes
+
+```java
+232: -  List<String> constraints = original.getXDCConstraints(ConstraintGroup.NORMAL);
+232: +  List<String> constraints = new ArrayList<>(original.getXDCConstraints(ConstraintGroup.NORMAL));
 ```
