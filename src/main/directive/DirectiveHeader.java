@@ -23,6 +23,7 @@ public class DirectiveHeader {
 	boolean buffer_inputs = false;
 	File initial_dcp = null;
 	File top_level_synth = null;
+	File project_xpr = null;
 	String module_name = null;
 	DirectiveHeader parent = null;
 
@@ -80,6 +81,10 @@ public class DirectiveHeader {
 		top_level_synth = Directive.getFirstFile(elem, HEADER.synth, fsys, false);
 		if (top_level_synth == null || !top_level_synth.exists())
 			top_level_synth = null;
+
+		project_xpr = Directive.getFirstFile(elem, HEADER.proj_xpr, fsys, false);
+		if (project_xpr == null || !project_xpr.exists())
+			project_xpr = null;
 
 		refresh = XMLParser.getFirstBool(elem, HEADER.refresh);
 
@@ -166,7 +171,7 @@ public class DirectiveHeader {
 	}
 
 	/**
-	 * @return hand_placer from this header; else from parent; else null.
+	 * @return Top level synth file from this header; else from parent; else null.
 	 */
 	public File getTopLevelSynth() {
 		if (top_level_synth != null)
@@ -176,6 +181,18 @@ public class DirectiveHeader {
 		return null;
 	}
 
+	/**
+	 * @return Project file (.xpr) from this header.
+	 */
+	public File getProject() {
+		return project_xpr;
+	}
+
+	/**
+	 * Return header of parent instance.
+	 * 
+	 * @return directive header that is a sibling to the parent inst of this header.
+	 */
 	public DirectiveHeader getParent() {
 		return parent;
 	}
@@ -193,11 +210,11 @@ public class DirectiveHeader {
 		public static final TAG refresh = new TAG("refresh");
 		public static final TAG hand_placer = new TAG("hand_placer");
 		public static final TAG buffer_inputs = new TAG("buffer_inputs");
+		public static final FILE proj_xpr = new FILE("proj");
 
 		HEADER() {
-			super("header",
-					Arrays.asList(iii_dir, ooc_dir, out_dir, initial, synth, module_name, refresh, buffer_inputs),
-					Arrays.asList());
+			super("header", Arrays.asList(iii_dir, ooc_dir, out_dir, initial, synth, module_name, refresh, hand_placer,
+					buffer_inputs, proj_xpr), Arrays.asList());
 		}
 	}
 

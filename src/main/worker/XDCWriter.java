@@ -56,11 +56,16 @@ public class XDCWriter {
 				+ "write_all_hier_xdc.tcl";
 		TCLScript script = new TCLScript((String) null, null, options, tcl_script_name);
 
-		// String proj_filename =
-		// "/nfs/ug/thesis/thesis0/pc2019/Igi/shell/pieces/tutorial2/tutorial2.xpr";
-		// String proj_filename =
-		// "/nfs/ug/thesis/thesis0/pc2019/Igi/shell/pieces/tutorial2-direct-connections/tutorial2.xpr";
-		String proj_filename = "/nfs/ug/thesis/thesis0/pc2019/Igi/shell/pieces/simple_test/simple_test.xpr";
+		File proj = directive.getHeader().getProject();
+		if(proj == null){
+			printIfVerbose("\nNo project specified.\nConstraints per cell cannot be generated for the cache.", directive.getHeader().isVerbose());
+			return;
+		}
+		if(!proj.isFile()){
+			printIfVerbose("\nSpecified project file '" + proj.getAbsolutePath() + "' was not found.\nConstraints per cell cannot be generated for the cache.", directive.getHeader().isVerbose());
+			return;
+		}
+		String proj_filename = proj.getAbsolutePath();
 
 		script.addCustomCmd("open_project -read_only " + proj_filename);
 		script.addCustomCmd("open_run synth_1 -name synth_1");
@@ -93,7 +98,7 @@ public class XDCWriter {
 		String hier_cell_name = (parent_path == null ? "" : parent_path + "/") + directive.getInstName();
 
 		// Don't write constraints again if constraints file is newer than open project
-		if (!constr_file.isFile() || FileTools.isFileNewer(proj_filename, constr_file.getAbsolutePath())) {
+		if (directive.isRefresh() || !constr_file.isFile() || FileTools.isFileNewer(proj_filename, constr_file.getAbsolutePath())) {
 			addWriteCmd(script, hier_cell_name, constr_file.getAbsolutePath());
 			num_lines++;
 		}

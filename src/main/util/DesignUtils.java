@@ -190,6 +190,7 @@ public class DesignUtils {
 			zis.close();
 			zos.close();
 
+			printIfVerbose("Dcp file written to '" + output_dcp + "'.", verbose);
 			printIfVerbose("Deleting old dcp file.\n", verbose);
 			FileTools.deleteFile(input_dcp);
 

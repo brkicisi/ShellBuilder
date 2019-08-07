@@ -124,10 +124,10 @@ public class Merger {
 	}
 
 	/**
-	 * Top level functions to fetch dcp (from {@link Directive#getDCP() directive}
-	 * or from .iii/{@link #MODULE_CACHE}), insert it into design and connect as
-	 * many {@link EDIFNet EDIFNets} as it can find using top level synthesized
-	 * design from header.
+	 * Top level function of Merger class. Fetches dcp (from
+	 * {@link Directive#getDCP() directive} or from .iii/{@link #MODULE_CACHE}),
+	 * inserts it into design and connects it to as many {@link EDIFNet EDIFNets} as
+	 * it can find using top level synthesized design from header.
 	 * 
 	 * @param directive Merge directive including the dcp to be merged.
 	 * @param args      Arguments from command line.
@@ -143,12 +143,15 @@ public class Merger {
 		}
 		insertOOC(mod, directive);
 		connectAll(args);
+		// todo lock P&R here?
 	}
 
 	/**
 	 * TODO remove this
 	 */
 	public void merge(Directive directive, Merger sub_merge, ArgsContainer args) {
+		MessageGenerator.briefErrorAndExit("Why are you calling 'public void merge(Directive directive, Merger sub_merge, ArgsContainer args)'");
+
 		Design d = sub_merge.design;
 		d.getNetlist().getTopCellInst();
 		d.getNetlist().renameNetlistAndTopCell(d.getName());
@@ -621,7 +624,7 @@ public class Merger {
 			mi.place(anchor_site);
 		} else {
 			MessageGenerator
-					.briefErrorAndExit("\nCould not find any where to place module instance '" + mi_name + "'.");
+					.briefErrorAndExit("\nCould not find anywhere to place module instance '" + mi_name + "'.");
 		}
 		// if (!mi.placeMINearTile(block.getBottomLeftTile(), SiteTypeEnum.SLICEL)
 		// && !mi.placeMINearTile(block.getBottomLeftTile(), SiteTypeEnum.SLICEM)) {
@@ -1005,4 +1008,53 @@ public class Merger {
 		// else already connected to same net
 	}
 
+	// TODO delete this
+	public void testAddILA(File output_dcp, DirectiveHeader head, ArgsContainer args) {
+		Design d = DesignUtils.safeReadCheckpoint(head.fsys().getRoot(FileSys.FILE_ROOT.PWD) + "/.ila/ila.dcp", head.isVerbose(), head.getIII());
+		d.getNetlist().getTopCellInst();
+		d.getNetlist().renameNetlistAndTopCell(d.getName());
+		Module mod = new Module(d);
+
+		String mod_name = FileTools.removeFileExtension(d.getName());
+		mod.setName(mod_name);
+		
+		// String pblock_str = null;
+		// mod.setPBlock(pblock_str);
+		myMigrateCellAndSubCells(mod.getNetlist().getTopCell());
+
+		ModuleInst mi = null;
+		Site anchor_site = null, tmp_site = null;
+		for (int x = 0; x < 100; x++) {
+			if (anchor_site != null)
+				break;
+			for (int y = 0; y < 200; y++) {
+				try {
+					String site_str = "SLICE_X" + x + "Y" + y;
+					tmp_site = device.getSite(site_str);
+					if (mod.isValidPlacement(tmp_site, device, design)) {
+						anchor_site = tmp_site;
+						break;
+					}
+				} catch (NullPointerException npe) {
+				}
+			}
+		}
+
+		String mi_name = null;
+		if (mi_name == null)
+			mi_name = mod.getName() + "_i";
+
+		if (anchor_site != null && mod.isValidPlacement(anchor_site, device, design)) {
+			mi = design.createModuleInst(mi_name, mod);
+			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
+			MessageGenerator
+					.briefMessage("Placing module instance '" + mi.getName() + "' at '" + anchor_site.getName() + "'.");
+			mi.place(anchor_site);
+		} else {
+			MessageGenerator
+					.briefErrorAndExit("\nCould not find anywhere to place module instance '" + mi_name + "'.");
+		}
+
+		HandPlacer.openDesign(design);
+	}
 }

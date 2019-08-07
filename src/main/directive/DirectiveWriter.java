@@ -161,6 +161,25 @@ public class DirectiveWriter {
 		List<KEY> attributes = new ArrayList<>();
 		String key = Directive.inst.key;
 
+		if (!include_primitives) {
+			boolean all_primitive = true;
+			for (EDIFCellInst cell_inst : ci.getCellType().getCellInsts()) {
+				if (!cell_inst.getCellType().isPrimitive()) {
+					all_primitive = false;
+					break;
+				}
+			}
+
+			// if only sub cell instances are primative
+			if (all_primitive) {
+				attributes.add(new WrKey(INST.type.key, INST.TYPE.TypeEnum.MERGE));
+				children.add(new WrLeaf(INST.inst_name.key, ci.getName()));
+				children.add(contructHeader(ci));
+				children.add(new WrLeaf(INST.only_wires.key));
+				return new WrNode(key, children, attributes);
+			}
+		}
+
 		attributes.add(new WrKey(INST.type.key, INST.TYPE.TypeEnum.BUILD));
 		children.add(new WrLeaf(INST.inst_name.key, ci.getName()));
 		children.add(contructHeader(ci));
@@ -183,7 +202,7 @@ public class DirectiveWriter {
 		String key = Directive.inst.key;
 
 		attributes.add(new WrKey(INST.type.key, INST.TYPE.TypeEnum.WRITE));
-		children.add(new WrLeaf(INST.dcp.key, Arrays.asList(new WrKey(INST.dcp.key, FILE.LOC.LocEnum.OUT)), ""));
+		children.add(new WrLeaf(INST.dcp.key, Arrays.asList(new WrKey(FILE.loc.key, FILE.LOC.LocEnum.OUT)), ""));
 
 		return new WrNode(key, children, attributes);
 	}
@@ -258,6 +277,10 @@ public class DirectiveWriter {
 	public static class WrLeaf extends WrNode {
 		String data = null;
 
+		public WrLeaf(String key) {
+			super(key);
+		}
+
 		public WrLeaf(String key, String data) {
 			super(key);
 			this.data = data;
@@ -270,6 +293,10 @@ public class DirectiveWriter {
 
 		@Override
 		void toLines(List<String> lines, String indentation) {
+			if(data == null && attributes().isEmpty()){
+				lines.add(indentation + "<" + key + "/>");
+				return;
+			}
 			StringBuilder sb = new StringBuilder(indentation + "<" + key);
 			for (KEY k : attributes())
 				sb.append(" " + ((WrKey) k).getFirstPairStr());

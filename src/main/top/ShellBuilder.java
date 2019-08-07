@@ -164,7 +164,7 @@ public class ShellBuilder {
 		// TODO remove this 'if'
 		// if (out_dcp.getName().startsWith("design_1_wrapper"))
 		// if (head.getParent() == null) // ! only run if top level module?
-			merger.placeAndRoute(out_dcp, head, args); // keep this
+		merger.placeAndRoute(out_dcp, head, args); // keep this
 
 		// Get dcp of last directive if it was a write
 		File write_dcp = null;
@@ -231,15 +231,12 @@ public class ShellBuilder {
 			directive_builder.getHeader().setRefresh(true);
 
 		// TODO remove this test
-		// File input_dcp = new
-		// File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
-		// "xml_final_all_green_placement.dcp");
-		// File output_dcp = new
-		// File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
-		// "tut2_with_ila.dcp");
-		// ILAAdder.testAddILA(input_dcp, output_dcp, directive_builder.getHeader(),
-		// args);
-		// TODO XDCWriter if any don't exist
+		File input_dcp = new File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
+				"xml_final_all_green_placement.dcp");
+		File output_dcp = new File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
+				"../ila_out/tut2_with_ila.dcp");
+		ILAAdder.testAddILA(input_dcp, output_dcp, directive_builder.getHeader(), args);
+		
 		XDCWriter xdc_writer = new XDCWriter(args, true);
 		for (Directive dir : directive_builder.getDirectives())
 			xdc_writer.writeAllHierXDC(dir);

@@ -3,7 +3,7 @@
 
 Builds a shell.
 
-Main worker is ShellBuilder.java
+Main worker is main.top.ShellBuilder
 
 ## Jars and Data
 
@@ -14,8 +14,9 @@ To fix this,
 1. Download RapidWright jars and data from the [Xilinx Github](https://github.com/Xilinx/RapidWright/releases).
 
    - Skip this step if you already have the correct jars on your computer.
-   - Under version v2018.3.3-beta (6d426bd) download `rapidwright_jars.zip`.
-   - Extract zip.
+   - Under version v2019.1.1-beta download `rapidwright_jars.zip` and `rapidwright_data.zip`.
+     - Note: I am not sure if the data zip is needed internally by RapidWright. I never reference it explicitly.
+   - Extract zips.
 
 1. Link jars to project.
 
@@ -24,13 +25,59 @@ To fix this,
 
 There seems to be something similar to this in `RapidWright/.travis.yml`.
 
-Note: This project doesn't know where data is.
+## ShellBuilder (main.top)
 
-## ShellBuilder
+This class should perform the main workflow of this project.
 
-This should perform the main workflow of this project.
+### XML
 
-### iii_dir, ooc_dir & out_dir
+ShellBuilder calls on Java librarys (JDOM - [org.w3c.dom](https://docs.oracle.com/javase/8/docs/api/index.html?org/w3c/dom/package-summary.html) & [javax.xml.parsers](https://docs.oracle.com/javase/8/docs/api/index.html?javax/xml/parsers/package-summary.html)) to parse the input XML file.
+
+XML must all be enclosed in a top level root. I have used `<root>` in the example below, but ShellBuilder never checks this tag.
+
+#### Tags
+
+The following are the tags that ShellBuilder checks. If tags are repeated within the same parent the first instance is used and any others are ignored.
+
+The exception to the above rule is `<inst>` which will be repeated many times (once for each instruction instance).
+
+| Index | Tag           | Children  | Attributes | Description                                                                                                                                                                       |
+| :---- | :------------ | :-------- | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | header        | 1.?       |            | Parent to metadata which is common for the whole build.                                                                                                                           |
+| 1.1   | iii_dir       |           |            | Working directory to save intermediate designs as well as temporary files.                                                                                                        |
+| 1.2   | ooc_dir       |           |            | Directory containing ooc dcps.                                                                                                                                                    |
+| 1.3   | out_dir       |           |            | Output directory.                                                                                                                                                                 |
+| 1.4   | initial       |           | loc (opt)  | Use this dcp as the base design to the Merger. Add all descendant modules to this design.                                                                                         |
+| 1.5   | synth         |           | loc (opt)  | Use this dcp as a template to copy nets from to connect the modules in this level of hierarchy (and descendant levels unless alternative synth specified).                        |
+| 1.6   | module_name   |           |            | Sets name of hierarchial module constructed by the build instr this header is part of (spaces will be replaced with underscores).                                                 |
+| 1.7   | refresh       |           |            | Place and route all descendant modules ignoring and overwriting cached results.                                                                                                   |
+| 1.8   | hand_placer   |           |            | Open RapidWright's HandPlacer to allow user to interactively place all descendant modules in this build. To finish and accept HandPlacer placement close it using the 'X' button. |
+| 1.9   | buffer_inputs |           |            | Indicates to ShellBuilder that this build should be a normal dcp (not an out of context dcp which is default).                                                                    |
+| 1.10  | proj          |           | loc (opt)  | Use this project file to write constraints for each cell.                                                                                                                         |
+|       |               |           |            |                                                                                                                                                                                   |
+| 2     | inst          | 1, 2, 2.? | type (req) | Instance of an instruction of the given type.                                                                                                                                     |
+| 2.1   | dcp           |           | loc (opt)  | Specify location of an input (merge) or output (write) dcp file.                                                                                                                  |
+| 2.2   | pblock        |           |            | String representing pblock to merge current design into.                                                                                                                          |
+| 2.3   | iname         |           |            | Name to give this instance of the design module.                                                                                                                                  |
+| 2.4   | force         |           |            | Force overwrite of file with this name for this write only.                                                                                                                       |
+| 2.5   | refresh       |           |            | Place and route this module ignoring and overwriting cached results.                                                                                                              |
+| 2.6   | hand_placer   |           |            | Open RapidWright's HandPlacer to allow user to interactively place this module. To finish and accept HandPlacer placement close it using the 'X' button.                          |
+| 2.7   | only_wires    |           |            | Indicates that this module contains only nets, pins and ports (thus can't be placed & routed ooc). Copy it from design in 1.5.                                                    |
+
+Note: (req) = required, (opt) = optional. If required, the parser will error if not included.
+
+| Attribute | Recognized Values   | Description                                                                                                                                                                                    |
+| :-------- | :------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| loc       | iii, ooc, out       | Specify root to resolve filename agianst.                                                                                                                                                      |
+| type      | merge, write, build | Type of operation to perform. Merge adds given dcp to design inside the given pblock. Build constructs a module from its descendant merges and builds. Write saves the current state to a dcp. |
+
+You can insert comments basically anywhere just as in standard xml.
+
+```xml
+<!-- This is an xml comment. -->
+```
+
+##### iii_dir, ooc_dir & out_dir
 
 The *iii_dir* is the working directory to save intermediate designs as well as temporary files (such as tcl scripts).
 
@@ -58,55 +105,7 @@ These are defined in the xml header using their name as the [tag](#Tags). If def
 
 The *iii_dir* will automatically be created in your pwd as `pwd/.iii` if not specified. The others are simply shortcuts for the user when inputting in the xml file (they will be created if specified but don't exist yet). In fact, if you decided to use the *ooc_dir* for output files and the out_dir for ooc modules, ShellBuilder would have no issue with that. Nor would it complain if you specified an ooc dcp or output file relative to the *iii_dir*.
 
-### XML
-
-ShellBuilder calls on Java librarys (JDOM - [org.w3c.dom](https://docs.oracle.com/javase/8/docs/api/index.html?org/w3c/dom/package-summary.html) & [javax.xml.parsers](https://docs.oracle.com/javase/8/docs/api/index.html?javax/xml/parsers/package-summary.html)) to parse the input XML file.
-
-XML must all be enclosed in a top level root. I have used `<root>` in the example below, but ShellBuilder never checks this tag.
-
-#### Tags
-
-The following are the tags that ShellBuilder checks. If tags are repeated within the same parent the first instance is used and any others are ignored.
-
-The exception to the above rule is `<inst>` which will be repeated many times (once for each instruction instance).
-
-<!-- markdownlint-disable MD033 -->
-| Index | Tag           | Children  | Attributes | Description                                                                                                                                                                       |
-| :---- | :------------ | :-------- | :--------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | header        | 1.?       |            | Parent to metadata which is common for the whole build.                                                                                                                           |
-| 1.1   | iii_dir       |           |            | Working directory to save intermediate designs as well as temporary files.                                                                                                        |
-| 1.2   | ooc_dir       |           |            | Directory containing ooc dcps.                                                                                                                                                    |
-| 1.3   | out_dir       |           |            | Output directory.                                                                                                                                                                 |
-| 1.4   | initial       |           | loc (opt)  | Use this as the base design to the Merger. Add all descendant modules to this design.                                                                                             |
-| 1.5   | synth         |           | loc (opt)  |                                                                                                                                                                                   |
-| 1.6   | module_name   |           |            | Sets name of hierarchial module constructed by the build instr this header is part of (spaces will be replaced with underscores).                                                 |
-| 1.7   | refresh       |           |            | Place and route all descendant modules ignoring and overwriting cached results.                                                                                                   |
-| 1.8   | hand_placer   |           |            | Open RapidWright's HandPlacer to allow user to interactively place all descendant modules in this build. To finish and accept HandPlacer placement close it using the 'X' button. |
-| 1.9   | buffer_inputs |           |            | Indicates to ShellBuilder that this build should be a normal dcp (not an out of context dcp which is default).                                                                    |
-|       |               |           |            |                                                                                                                                                                                   |
-| 2     | inst          | 1, 2, 2.? | type (req) | Instance of an instruction of the given type.                                                                                                                                     |
-| 2.1   | dcp           |           | loc (opt)  | Specify location of an input (merge) or output (write) dcp file.                                                                                                                  |
-| 2.2   | pblock        |           |            | String representing pblock to merge current design into.                                                                                                                          |
-| 2.3   | iname         |           |            | Name to give this instance of the design module.                                                                                                                                  |
-| 2.4   | force         |           |            | Force overwrite of file with this name for this write only.                                                                                                                       |
-| 2.5   | refresh       |           |            | Place and route this module ignoring and overwriting cached results.                                                                                                              |
-| 2.6   | hand_placer   |           |            | Open RapidWright's HandPlacer to allow user to interactively place this module. To finish and accept HandPlacer placement close it using the 'X' button.                          |
-| 2.7   | only_wires    |           |            | Indicates that this module contains only nets, pins and ports (thus can't be placed & routed ooc). Copy it from design in 1.5.                                                    |
-
-| Attribute | Recognized Values   | Description                                                                                                                                                                                    |
-| :-------- | :------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| loc       | iii, ooc, out       | Specify root to resolve filename agianst.                                                                                                                                                      |
-| type      | merge, write, build | Type of operation to perform. Merge adds given dcp to design inside the given pblock. Build constructs a module from its descendant merges and builds. Write saves the current state to a dcp. |
-
-<!-- markdownlint-enable MD033 -->
-
-You can insert comments basically anywhere just as in standard xml.
-
-```xml
-<!-- This is an xml comment. -->
-```
-
-Here is an example.
+##### An example
 
 ```xml
 <!-- 

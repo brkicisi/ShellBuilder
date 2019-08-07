@@ -3,14 +3,14 @@
 
 bin
 .Xil
+.ila
 .vscode
+hd_visual
 **/vivado*.log
 **/vivado*.jou
+**/.temp_*.xdef
 **/.temp_*.edf
 
 RapidWright/bin/**
 RapidWright/data/**
 RapidWright/jars/**
-
-hd_visual/*_pblock_*.tcl
-.temp_xdef*
