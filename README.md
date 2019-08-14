@@ -5,6 +5,8 @@ Builds a shell.
 
 Main worker is main.top.ShellBuilder
 
+More documentation in [documentation.md](documentation.md).
+
 ## Jars and Data
 
 This git repository contains a submodule of RapidWright. However, this submodule does not contain the required jar files.
@@ -57,7 +59,7 @@ The exception to the above rule is `<inst>` which will be repeated many times (o
 |       |               |           |            |                                                                                                                                                                                   |
 | 2     | inst          | 1, 2, 2.? | type (req) | Instance of an instruction of the given type.                                                                                                                                     |
 | 2.1   | dcp           |           | loc (opt)  | Specify location of an input (merge) or output (write) dcp file.                                                                                                                  |
-| 2.2   | pblock        |           |            | String representing pblock to merge current design into.                                                                                                                          |
+| 2.2   | pblock        |           |            | String representing pblock to place and route current design into. Space separated list of pblock ranges.                                                                         |
 | 2.3   | iname         |           |            | Name to give this instance of the design module.                                                                                                                                  |
 | 2.4   | force         |           |            | Force overwrite of file with this name for this write only.                                                                                                                       |
 | 2.5   | refresh       |           |            | Place and route this module ignoring and overwriting cached results.                                                                                                              |
@@ -104,6 +106,10 @@ These are defined in the xml header using their name as the [tag](#Tags). If def
 **Important**: None of these three directories must be specified in the xml header.
 
 The *iii_dir* will automatically be created in your pwd as `pwd/.iii` if not specified. The others are simply shortcuts for the user when inputting in the xml file (they will be created if specified but don't exist yet). In fact, if you decided to use the *ooc_dir* for output files and the out_dir for ooc modules, ShellBuilder would have no issue with that. Nor would it complain if you specified an ooc dcp or output file relative to the *iii_dir*.
+
+### NOTES
+
+if `only_wires` and `dcp` specified. Then use dcp as synth_1.
 
 ##### An example
 
