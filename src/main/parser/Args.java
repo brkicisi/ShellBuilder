@@ -29,7 +29,7 @@ public final class Args {
 	// Used {f, h, q, r, Vv}
 	static final TokenArg[] TOKEN_LIST = {
 			new TokenArg(Tag.REFRESH.toString(), new String[] { "-r", "--refresh" },
-					"Force recompilation from first directive. Ignore any intermediate designs."),
+					"Force recompilation for all directives. Ignore any intermediate designs."),
 			new TokenArg(Tag.FORCE.toString(), new String[] { "-f", "--force" },
 					"Force overwrite for ALL output files. You can specify force overwrite for individual "
 							+ "files in the xml building instructions."), // (intermediate files in .iii are always

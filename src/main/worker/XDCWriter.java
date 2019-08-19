@@ -57,12 +57,16 @@ public class XDCWriter {
 		TCLScript script = new TCLScript((String) null, null, options, tcl_script_name);
 
 		File proj = directive.getHeader().getProject();
-		if(proj == null){
-			printIfVerbose("\nNo project specified.\nConstraints per cell cannot be generated for the cache.", directive.getHeader().isVerbose());
+		if (proj == null) {
+			printIfVerbose("\nNo project specified.\nConstraints per cell cannot be generated for the cache.",
+					directive.getHeader().isVerbose());
 			return;
 		}
-		if(!proj.isFile()){
-			printIfVerbose("\nSpecified project file '" + proj.getAbsolutePath() + "' was not found.\nConstraints per cell cannot be generated for the cache.", directive.getHeader().isVerbose());
+		if (!proj.isFile()) {
+			printIfVerbose(
+					"\nSpecified project file '" + proj.getAbsolutePath()
+							+ "' was not found.\nConstraints per cell cannot be generated for the cache.",
+					directive.getHeader().isVerbose());
 			return;
 		}
 		String proj_filename = proj.getAbsolutePath();
@@ -86,6 +90,16 @@ public class XDCWriter {
 			script.run();
 	}
 
+	/**
+	 * If this directive does not have an up to date constraints file in the cache
+	 * add a line to the script to generate it. Recurse on descendants.
+	 * 
+	 * @param script        Append write_xdc lines to this script.
+	 * @param proj_filename Project to check if constraints file is newer than.
+	 * @param directive     Check cached constraints of this module.
+	 * @param parent_path   What module instance is the parent of this directive.
+	 * @return Number of lines added to the script.
+	 */
 	private int generateWriteLines(TCLScript script, String proj_filename, Directive directive, String parent_path) {
 		int num_lines = 0;
 
@@ -98,7 +112,8 @@ public class XDCWriter {
 		String hier_cell_name = (parent_path == null ? "" : parent_path + "/") + directive.getInstName();
 
 		// Don't write constraints again if constraints file is newer than open project
-		if (directive.isRefresh() || !constr_file.isFile() || FileTools.isFileNewer(proj_filename, constr_file.getAbsolutePath())) {
+		if (directive.isRefresh() || !constr_file.isFile()
+				|| FileTools.isFileNewer(proj_filename, constr_file.getAbsolutePath())) {
 			addWriteCmd(script, hier_cell_name, constr_file.getAbsolutePath());
 			num_lines++;
 		}
@@ -116,6 +131,13 @@ public class XDCWriter {
 		script.add(TCLEnum.WRITE_XDC, options, custom_opts, filename);
 	}
 
+	/**
+	 * Find corresponding directory in the cache, create if it doesn't exist.
+	 * 
+	 * @param directive Find cache directory corresponding to this module.
+	 * @param args      Arguments from command line.
+	 * @return Directory in cache.
+	 */
 	public static File findOrMakeCacheDir(Directive directive, ArgsContainer args) {
 		File cache_dir = new File(directive.getIII(), Merger.MODULE_CACHE);
 		if (!cache_dir.isDirectory()) {
@@ -148,6 +170,13 @@ public class XDCWriter {
 		return impl_dir;
 	}
 
+	/**
+	 * Find corresponding directory in the cache, create if it doesn't exist.
+	 * 
+	 * @param head Find cache directory corresponding to this module.
+	 * @param args Arguments from command line.
+	 * @return Directory in cache.
+	 */
 	public static File findOrMakeCacheDir(DirectiveHeader head, ArgsContainer args) {
 		File cache_dir = new File(head.getIII(), Merger.MODULE_CACHE);
 		if (!cache_dir.isDirectory()) {

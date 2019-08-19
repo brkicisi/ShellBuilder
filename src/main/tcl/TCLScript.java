@@ -154,11 +154,16 @@ public class TCLScript {
 		return run(true);
 	}
 
+	public boolean USE_DEFAULT_VIVADO_VERSION = false;
+
 	/**
 	 * Execute tcl script.
+	 * <p>
+	 * To run in a different version of Vivado, use {@link FileTools#runCommand} to
+	 * source Vivado before calling this function.
 	 * 
 	 * @param throw_error Throw an error if the process does not return 0 (success).
-	 * @return Null upon error. Else same return as from
+	 * @return Null upon error in {@link #write}. Else same return as from
 	 *         {@link FileTools#runCommand}.
 	 */
 	public Integer run(boolean throw_error) {
@@ -166,7 +171,21 @@ public class TCLScript {
 		if (!wrote)
 			return null;
 
-		Integer ret = FileTools.runCommand(run_vivado + " " + tcl_file.getAbsolutePath(), true);
+		Integer ret = 0;
+		if (USE_DEFAULT_VIVADO_VERSION) {
+			ret = FileTools.runCommand(run_vivado + " " + tcl_file.getAbsolutePath(), true);
+		} else {
+			String bash_file = tcl_file.getAbsolutePath().replace(".tcl", ".sh");
+			List<String> bash_lines = new ArrayList<>();
+			bash_lines.add("#! /bin/bash");
+			bash_lines.add("source /cad1/Xilinx/Vivado/2018.1/settings64.sh"); // TODO Vivado version
+			bash_lines.add(run_vivado + " " + tcl_file.getAbsolutePath());
+			FileTools.writeLinesToTextFile(bash_lines, bash_file);
+
+			MessageGenerator.briefMessage(""); // new line
+			ret = FileTools.runCommand("bash " + bash_file, true);
+		}
+
 		if (throw_error && ret != 0)
 			MessageGenerator.briefErrorAndExit("Tcl script returned error code " + ret + ".");
 		return ret;

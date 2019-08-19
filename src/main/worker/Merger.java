@@ -1,10 +1,15 @@
 package main.worker;
 
+import java.awt.Point;
 import java.io.File;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.Map.Entry;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -16,6 +21,7 @@ import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
@@ -60,7 +66,7 @@ public class Merger {
 	private Design design = null;
 	private Device device = null;
 	private EDIFNetlist synth_netlist = null;
-	private Set<String> wire_cells = new HashSet<>();
+	private Map<String, EDIFCell> wire_cells = new HashMap<>();
 	private File final_dcp = null;
 
 	/**
@@ -135,6 +141,7 @@ public class Merger {
 	public void merge(Directive directive, ArgsContainer args) {
 		Module mod = fetchAndPrepModule(directive, args);
 		if (design == null) {
+			// design hasn't been initialized yet
 			if (directive.getHeader().getModuleName() != null)
 				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
 						directive.getHeader(), args);
@@ -143,46 +150,7 @@ public class Merger {
 		}
 		insertOOC(mod, directive);
 		connectAll(args);
-		// todo lock P&R here?
-	}
-
-	/**
-	 * TODO remove this
-	 */
-	public void merge(Directive directive, Merger sub_merge, ArgsContainer args) {
-		MessageGenerator.briefErrorAndExit("Why are you calling 'public void merge(Directive directive, Merger sub_merge, ArgsContainer args)'");
-
-		Design d = sub_merge.design;
-		d.getNetlist().getTopCellInst();
-		d.getNetlist().renameNetlistAndTopCell(d.getName());
-		Module mod = new Module(d);
-
-		String mod_name = FileTools.removeFileExtension(directive.getDCP().getName());
-		mod.setName(mod_name);
-		// TODO pblock string may be null
-		mod.setPBlock(directive.getPBlockStr());
-		if (design == null) {
-			if (directive.getHeader().getModuleName() != null)
-				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
-						directive.getHeader(), args);
-			else
-				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
-		}
-		// intended to remove black box (will end up removing any previous
-		// implementation of the cell)
-		// design.getNetlist().getWorkLibrary().removeCell(mod.getNetlist().getTopCell().getName());
-		// design.getNetlist().migrateCellAndSubCells(mod.getNetlist().getTopCell());
-		myMigrateCellAndSubCells(mod.getNetlist().getTopCell());
-
-		if (design == null) {
-			if (directive.getHeader().getModuleName() != null)
-				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
-						directive.getHeader(), args);
-			else
-				init(new Design("top", mod.getDevice().getDeviceName()), directive.getHeader(), args);
-		}
-		insertOOC(mod, directive);
-		connectAll(args);
+		// TODO lock P&R here?
 	}
 
 	/**
@@ -205,15 +173,24 @@ public class Merger {
 		Module mod = null;
 		boolean verbose = (args == null) ? false : args.verbose();
 
-		if (directive.getDCP() == null) {
-			if (directive.isOnlyWires()) {
-				wire_cells.add(directive.getInstName());
-				return null;
-			} else
-				MessageGenerator.briefErrorAndExit("\nNo dcp in merge directive.\nExiting.");
-		} else if (!directive.getDCP().exists())
+		if (directive.isOnlyWires()) {
+			EDIFCell top = null;
+			if (directive.getDCP() == null) {
+				top = design.getNetlist().getTopCell();
+			} else {
+				Design d = DesignUtils.safeReadCheckpoint(directive.getDCP(), directive.getHeader().isVerbose(),
+						directive.getIII());
+				top = d.getNetlist().getTopCell();
+			}
+			EDIFCell synth_top = synth_netlist.getCell(top.getName());
+			wire_cells.put(directive.getInstName(), synth_top);
+			return null;
+		} else if (directive.getDCP() == null) {
+			MessageGenerator.briefErrorAndExit("\nNo dcp in merge directive.\nExiting.");
+		} else if (!directive.getDCP().exists()) {
 			MessageGenerator.briefErrorAndExit("\nCould not find dcp '" + directive.getDCP().getAbsolutePath()
 					+ "' specified in merge directive.\nExiting.");
+		}
 
 		boolean was_already_cached = false;
 		String cached_dcp_str = null;
@@ -253,10 +230,11 @@ public class Merger {
 
 		String mod_name = FileTools.removeFileExtension(directive.getDCP().getName());
 		mod.setName(mod_name);
-		// TODO pblock string may be null
 		if (directive.getPBlockStr() != null)
 			mod.setPBlock(directive.getPBlockStr());
+
 		if (design == null) {
+			// design hasn't been initialized yet
 			if (directive.getHeader().getModuleName() != null)
 				init(new Design(directive.getHeader().getModuleName(), mod.getDevice().getDeviceName()),
 						directive.getHeader(), args);
@@ -370,13 +348,13 @@ public class Merger {
 			printIfVerbose("\nCan't find module '" + module_name + "' in cache.", args.verbose());
 			return null;
 		}
-		if (!new File(impl_dir, DependancyMeta.META_FILENAME).isFile()) {
+		File meta_file = new File(impl_dir, DependancyMeta.META_FILENAME);
+		if (!meta_file.isFile()) {
 			printIfVerbose("\nCan't find metadata for module '" + module_name + "' in cache.", args.verbose());
 			return null;
 		}
 
 		// read metadata
-		File meta_file = new File(impl_dir, DependancyMeta.META_FILENAME);
 		DependancyMeta meta = new DependancyMeta(meta_file, args.verbose());
 		DependancyMeta.DepSet dep_set = new DependancyMeta.DepSet(meta);
 		DependancyMeta.DepSet dep_set2 = new DependancyMeta.DepSet(dep_set);
@@ -444,9 +422,8 @@ public class Merger {
 			if (!FileTools.isFileNewer(cached_dcp.getAbsolutePath(), directive.getDCP().getAbsolutePath())) {
 				printIfVerbose("\nModule '" + module_name + "' is outdated.", args.verbose());
 				return null;
-			} else {
-				dep_set2.remove(getModuleName(directive, args), "");
 			}
+			dep_set2.remove(getModuleName(directive, args), "");
 		}
 
 		if (!dep_set2.isEmpty()) {
@@ -465,17 +442,12 @@ public class Merger {
 	 * @return String where output was written.
 	 */
 	private static String placeRouteOOC(Directive directive, ArgsContainer args) {
-		// if (directive.getInstName().equals("clk_wiz_1")) { // TODO remove this 'if'
-		// return findModuleInCache(directive, args).getAbsolutePath();
-		// }
-
 		String module_name = getModuleName(directive, args);
 		if (module_name == null)
 			return null;
 
 		if (directive.getPBlockStr() == null) {
-			// TODO may not have specified pblock for non base designs
-			// ? should pblock be forced to exist for base designs?
+			// TODO should pblock be forced to exist for base designs?
 			printIfVerbose("\nNo pblock specified for '" + module_name + "'.", args.verbose());
 			// return null;
 		}
@@ -498,18 +470,6 @@ public class Merger {
 		String tcl_script_file = directive.getIII().getAbsolutePath() + "/pblock_place_route_step.tcl";
 		TCLScript script = new TCLScript(input_dcp, output_dcp, options, tcl_script_file);
 
-		// TODO do I want to add constraints to dcp's here?
-		// TODO even if I do, fix it up
-		// File src_constrs = new File(directive.getHeader().getIII(),
-		// "moduleCache/design_2_clk_wiz_1_1/constraints.xdc");
-		// // File src_constrs = new
-		// File(directive.getHeader().getIII().getParentFile(),
-		// // "tut2_proj1_constrs_1_no_flags.xdc");
-		// // DesignUtils.copyConstrsFileIntoDCP(src_constrs, new File(output_dcp),
-		// directive.getHeader().isVerbose(),
-		// // directive.getHeader().getIII());
-		// // script.addCustomCmd("write_xdc -cell " + hier_cell_name + " -no_fixed_only
-		// " + xdc_file.getAbsolutePath());
 		File src_constrs = new File(cache_impl_dir, XDCWriter.CONSTRAINTS_FILE);
 		if (!(directive.isSubBuilder() && directive.getSubBuilder().getHeader().isBufferedInputs()))
 			script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged -mode out_of_context",
@@ -517,22 +477,48 @@ public class Merger {
 		else
 			script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged", src_constrs.getAbsolutePath());
 
-		if (directive.getPBlockStr() != null) {
-			String pblock_name = "[get_property TOP [current_design ]]" + "_pblock";
-			script.addCustomCmd("create_pblock " + pblock_name);
-			script.addCustomCmd(
-					"resize_pblock -add {" + directive.getPBlockStr() + "} [get_pblocks " + pblock_name + "]");
-			script.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells]");
-			script.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
-			script.addCustomCmd("set_property SNAPPING_MODE ROUTING [get_pblocks " + pblock_name + "]");
+		Design d = DesignUtils.safeReadCheckpoint(input_dcp, directive.getHeader().isVerbose(), directive.getIII());
+		EDIFCell top = d.getNetlist().getTopCell();
+
+		if (!top.getCellInsts().isEmpty()) {
+			if (directive.getPBlockStr() != null) {
+				String pblock_name = "[get_property TOP [current_design ]]" + "_pblock";
+				script.addCustomCmd("create_pblock " + pblock_name);
+				script.addCustomCmd(
+						"resize_pblock -add {" + directive.getPBlockStr() + "} [get_pblocks " + pblock_name + "]");
+				script.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells]");
+				script.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
+				script.addCustomCmd("set_property SNAPPING_MODE ROUTING [get_pblocks " + pblock_name + "]");
+			}
+			// TODO opt?
+			// script.add(TCLEnum.OPT);
+			script.add(TCLEnum.PLACE);
+			script.add(TCLEnum.ROUTE);
 		}
-		// TODO opt?
-		// script.add(TCLEnum.OPT);
-		script.add(TCLEnum.PLACE);
-		script.add(TCLEnum.ROUTE);
 		script.add(TCLEnum.WRITE_DCP);
 		script.add(TCLEnum.WRITE_EDIF);
-		script.run();
+		// script.run();
+
+		int ret = script.run(false);
+		if (ret != 0) {
+			TCLScript script2 = new TCLScript(input_dcp, output_dcp, options, tcl_script_file);
+			if (!top.getCellInsts().isEmpty()) {
+				if (directive.getPBlockStr() != null) {
+					String pblock_name = "[get_property TOP [current_design ]]" + "_pblock";
+					script2.addCustomCmd("create_pblock " + pblock_name);
+					script2.addCustomCmd(
+							"resize_pblock -add {" + directive.getPBlockStr() + "} [get_pblocks " + pblock_name + "]");
+					script2.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells]");
+					script2.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
+					script2.addCustomCmd("set_property SNAPPING_MODE ROUTING [get_pblocks " + pblock_name + "]");
+				}
+				script2.add(TCLEnum.PLACE);
+				script2.add(TCLEnum.ROUTE);
+			}
+			script2.add(TCLEnum.WRITE_DCP);
+			script2.add(TCLEnum.WRITE_EDIF);
+			script2.run();
+		}
 
 		return output_dcp;
 	}
@@ -565,6 +551,34 @@ public class Merger {
 		return module_name;
 	}
 
+	private Point getAnchorTarget(Directive directive) {
+		if (directive == null)
+			return null;
+
+		if (directive.getPBlockStr() != null) {
+			PBlock block = new PBlock(device, directive.getPBlockStr());
+			Tile t = block.getBottomLeftTile();
+			return new Point(t.getColumn(), t.getRow());
+		}
+		if (!directive.isSubBuilder())
+			return null;
+
+		Point p = new Point(Integer.MAX_VALUE, Integer.MAX_VALUE);
+		for (Directive dir : directive.getSubBuilder().getDirectives()) {
+			Point p_sub = getAnchorTarget(dir);
+			if (p_sub == null)
+				continue;
+
+			if (p_sub.x < p.x)
+				p.x = p_sub.x;
+			if (p_sub.y < p.y)
+				p.y = p_sub.y;
+		}
+		if (p.x == Integer.MAX_VALUE || p.y == Integer.MAX_VALUE)
+			return null;
+		return p;
+	}
+
 	/**
 	 * Inserts the ooc placed and routed module to the design.
 	 * 
@@ -590,22 +604,34 @@ public class Merger {
 		// }
 		// TODO better auto placer
 
-		Site anchor_site = null, tmp_site = null;
-		for (int x = 0; x < 100; x++) {
-			if (anchor_site != null)
-				break;
-			for (int y = 0; y < 200; y++) {
-				try {
-					String site_str = "SLICE_X" + x + "Y" + y;
-					tmp_site = device.getSite(site_str);
-					if (mod.isValidPlacement(tmp_site, device, design)) {
-						anchor_site = tmp_site;
-						break;
-					}
-				} catch (NullPointerException npe) {
-				}
-			}
-		}
+		Site anchor_site = null;
+		// Site tmp_site = null;
+		// for (int x = 0; x < 1000; x++) {
+		// if (anchor_site != null)
+		// break;
+		// for (int y = 0; y < 2000; y++) {
+		// try {
+		// String site_str = "SLICE_X" + x + "Y" + y;
+		// tmp_site = device.getSite(site_str);
+		// if (mod.isValidPlacement(tmp_site, device, design)) {
+		// anchor_site = tmp_site;
+		// break;
+		// }
+		// } catch (NullPointerException npe) {
+		// }
+		// }
+		// }
+		// if (anchor_site == null || !mod.isValidPlacement(anchor_site, device,
+		// design)) {
+		// List<Site> valid_placements = mi.getAllValidPlacements();
+		// for (Site s : valid_placements) {
+		// if (mod.isValidPlacement(s, device, design)) {
+		// anchor_site = s;
+		// break;
+		// }
+		// }
+
+		// }
 
 		// BlockPlacer2 placer = new BlockPlacer2();
 		// placer.placeModuleNear(...);
@@ -616,16 +642,66 @@ public class Merger {
 		if (mi_name == null)
 			mi_name = mod.getName() + "_i";
 
-		if (anchor_site != null && mod.isValidPlacement(anchor_site, device, design)) {
-			mi = design.createModuleInst(mi_name, mod);
-			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
-			MessageGenerator
-					.briefMessage("Placing module instance '" + mi.getName() + "' at '" + anchor_site.getName() + "'.");
-			mi.place(anchor_site);
-		} else {
-			MessageGenerator
-					.briefErrorAndExit("\nCould not find anywhere to place module instance '" + mi_name + "'.");
+		mi = design.createModuleInst(mi_name, mod);
+		mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
+
+		printIfVerbose("Finding all valid placements for module '" + mod.getName() + "'",
+				directive.getHeader().isVerbose());
+		List<Site> valid_placements = mi.getAllValidPlacements();
+		int avg_pblock_row = 0, avg_pblock_col = 0;
+		// if (directive.getPBlockStr() != null) {
+		// PBlock block = new PBlock(device, directive.getPBlockStr());
+		// int count = 0;
+		// for (Tile t : block.getAllTiles()) {
+		// avg_pblock_col += t.getColumn();
+		// avg_pblock_row += t.getRow();
+		// count++;
+		// }
+		// if (count > 0) {
+		// avg_pblock_col /= count;
+		// avg_pblock_row /= count;
+		// }
+		// } else if (directive.isSubBuilder()) {
+		// int count = 0;
+		// for (Directive dir : directive.getSubBuilder().getDirectives()) {
+		// if (dir.getPBlockStr() != null) {
+		// PBlock block = new PBlock(device, dir.getPBlockStr());
+		// for (Tile t : block.getAllTiles()) {
+		// avg_pblock_col += t.getColumn();
+		// avg_pblock_row += t.getRow();
+		// count++;
+		// }
+		// }
+		// }
+		// if (count > 0) {
+		// avg_pblock_col /= count;
+		// avg_pblock_row /= count;
+		// }
+		// }
+		Point p = getAnchorTarget(directive);
+		if (p != null) {
+			avg_pblock_col = p.x;
+			avg_pblock_row = p.y;
 		}
+
+		int min_manhattan_distance = Integer.MAX_VALUE;
+		for (Site s : valid_placements) {
+			Tile t = s.getTile();
+			int distance = java.lang.Math.abs(t.getRow() - avg_pblock_row)
+					+ java.lang.Math.abs(t.getColumn() - avg_pblock_col);
+			if (mod.isValidPlacement(s, device, design) && distance < min_manhattan_distance) {
+				anchor_site = s;
+				min_manhattan_distance = distance;
+			}
+		}
+
+		if (anchor_site != null) { // TODO printIfVerbose
+			printIfVerbose("Placing module instance '" + mi.getName() + "' at '" + anchor_site.getName() + "'.",
+					directive.getHeader().isVerbose());
+			mi.place(anchor_site);
+		} else
+			MessageGenerator.briefError("\nCould not find anywhere to place module instance '" + mi_name + "'.\n");
+
 		// if (!mi.placeMINearTile(block.getBottomLeftTile(), SiteTypeEnum.SLICEL)
 		// && !mi.placeMINearTile(block.getBottomLeftTile(), SiteTypeEnum.SLICEM)) {
 
@@ -650,8 +726,8 @@ public class Merger {
 		// mi.place(anchor_site);
 		// }
 
-		// TODO only do this if anchor_site != 0 ?
-		if (directive.isHandPlacer())
+		// TODO only do this if anchor_site != null ?
+		if (directive.isHandPlacer() && (anchor_site != null))
 			HandPlacer.openDesign(design);
 		return mi;
 	}
@@ -683,10 +759,13 @@ public class Merger {
 			printIfVerbose("\nNo top level synth loaded. Can't make any connections.", args.verbose());
 			return;
 		}
+
 		EDIFCell top = design.getNetlist().getTopCell();
 		EDIFCell synth_top = synth_netlist.getCell(top.getName());
 
-		for (String ci_name : wire_cells) {
+		for (Entry<String, EDIFCell> e : wire_cells.entrySet()) {
+			String ci_name = e.getKey();
+			// EDIFCell sub_synth_top = e.getValue();
 			EDIFCellInst synth_ci = synth_top.getCellInst(ci_name);
 			if (synth_ci == null) {
 				printIfVerbose("Couldn't find wire cell instance '" + ci_name + "'.", args.verbose());
@@ -701,6 +780,22 @@ public class Merger {
 			edifnetlist.setDesign(edifdsgn);
 			Design d = new Design(synth_ci.getName(), design.getPartName());
 			d.setNetlist(edifnetlist);
+
+			// EDIFCell sub_top = d.getNetlist().getTopCell();
+
+			// for (EDIFCellInst synth_inst : sub_synth_top.getCellInsts()) {
+			// EDIFCell synth_cell = synth_inst.getCellType();
+			// // design.getNetlist().migrateCellAndSubCells(synth_cell);
+			// myMigrateCellAndSubCells(synth_cell);
+			// if (synth_cell.isPrimitive())
+			// new EDIFCellInst(synth_inst.getName(), synth_cell, sub_top);
+			// }
+
+			// for (EDIFPort synth_port : sub_synth_top.getPorts())
+			// if (sub_top.getPort(synth_port.getBusName()) == null)
+			// sub_top.createPort(synth_port.getName(), synth_port.getDirection(),
+			// synth_port.getWidth());
+
 			Module mod = new Module(d);
 			ModuleInst mi = design.createModuleInst(synth_ci.getName(), mod);
 			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
@@ -740,7 +835,7 @@ public class Merger {
 	public void placeAndRoute(File inout_file, DirectiveHeader head, ArgsContainer args) {
 		String options = (args == null) ? "f" : args.options("f");
 		String inout_dcp = inout_file.getAbsolutePath();
-		String tcl_script_file = head.getIII().getAbsolutePath() + "/pblock_place_route_step.tcl";
+		String tcl_script_file = head.getIII().getAbsolutePath() + "/place_route_step.tcl";
 
 		TCLScript script = new TCLScript(inout_dcp, inout_dcp, options, tcl_script_file);
 
@@ -758,7 +853,17 @@ public class Merger {
 		script.add(TCLEnum.ROUTE);
 		script.add(TCLEnum.WRITE_DCP);
 		script.add(TCLEnum.WRITE_EDIF);
-		script.run();
+		// script.run();
+
+		int ret = script.run(false);
+		if (ret != 0) {
+			TCLScript script2 = new TCLScript(inout_dcp, inout_dcp, options, tcl_script_file);
+			script2.add(TCLEnum.PLACE);
+			script2.add(TCLEnum.ROUTE);
+			script2.add(TCLEnum.WRITE_DCP);
+			script2.add(TCLEnum.WRITE_EDIF);
+			script2.run();
+		}
 	}
 
 	private static void printIfVerbose(String msg, boolean verbose) {
@@ -778,8 +883,8 @@ public class Merger {
 		dcp_file.getParentFile().mkdirs();
 		if (design != null) {
 			// TODO lock Placement and Routing
-			lockPlacement(design);
-			lockRouting(design);
+			// lockPlacement(design);
+			// lockRouting(design);
 
 			design.writeCheckpoint(dcp_file.getAbsolutePath());
 		}
@@ -1006,55 +1111,5 @@ public class Merger {
 			source_pi.getNet().addPortInst(sink_pi);
 		}
 		// else already connected to same net
-	}
-
-	// TODO delete this
-	public void testAddILA(File output_dcp, DirectiveHeader head, ArgsContainer args) {
-		Design d = DesignUtils.safeReadCheckpoint(head.fsys().getRoot(FileSys.FILE_ROOT.PWD) + "/.ila/ila.dcp", head.isVerbose(), head.getIII());
-		d.getNetlist().getTopCellInst();
-		d.getNetlist().renameNetlistAndTopCell(d.getName());
-		Module mod = new Module(d);
-
-		String mod_name = FileTools.removeFileExtension(d.getName());
-		mod.setName(mod_name);
-		
-		// String pblock_str = null;
-		// mod.setPBlock(pblock_str);
-		myMigrateCellAndSubCells(mod.getNetlist().getTopCell());
-
-		ModuleInst mi = null;
-		Site anchor_site = null, tmp_site = null;
-		for (int x = 0; x < 100; x++) {
-			if (anchor_site != null)
-				break;
-			for (int y = 0; y < 200; y++) {
-				try {
-					String site_str = "SLICE_X" + x + "Y" + y;
-					tmp_site = device.getSite(site_str);
-					if (mod.isValidPlacement(tmp_site, device, design)) {
-						anchor_site = tmp_site;
-						break;
-					}
-				} catch (NullPointerException npe) {
-				}
-			}
-		}
-
-		String mi_name = null;
-		if (mi_name == null)
-			mi_name = mod.getName() + "_i";
-
-		if (anchor_site != null && mod.isValidPlacement(anchor_site, device, design)) {
-			mi = design.createModuleInst(mi_name, mod);
-			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
-			MessageGenerator
-					.briefMessage("Placing module instance '" + mi.getName() + "' at '" + anchor_site.getName() + "'.");
-			mi.place(anchor_site);
-		} else {
-			MessageGenerator
-					.briefErrorAndExit("\nCould not find anywhere to place module instance '" + mi_name + "'.");
-		}
-
-		HandPlacer.openDesign(design);
 	}
 }

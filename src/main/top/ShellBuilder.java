@@ -105,7 +105,7 @@ public class ShellBuilder {
 
 			// TODO allow for default intermediate dcp names
 			if (directive.getDCP() == null)
-				System.err.println("Default intermediate dcp naming has not been implemented yet.");
+				MessageGenerator.briefErrorAndExit("Default intermediate dcp naming has not been implemented yet.");
 
 			String output_dcp = directive.getDCP().getAbsolutePath();
 			printIfVerbose("Output dcp to '" + output_dcp + "'");
@@ -125,6 +125,8 @@ public class ShellBuilder {
 	public Merger runBuilder(DirectiveBuilder directive_builder) {
 		Merger merger = null;
 		DirectiveHeader head = directive_builder.getHeader();
+		if (head == null || head.getModuleName() == null)
+			MessageGenerator.briefErrorAndExit("No name specified for module being built.");
 
 		File initial = head.getInitial();
 		if (initial != null) {
@@ -143,28 +145,16 @@ public class ShellBuilder {
 			runDirective(step, merger);
 
 		File iii_dir = (head.getParent() == null) ? head.getIII() : head.getParent().getIII();
-		if (head.getModuleName() == null)
-			MessageGenerator.briefErrorAndExit("No name specified for module being built.");
-
 		File out_dcp = new File(iii_dir,
 				Merger.MODULE_CACHE + "/" + head.getModuleName() + "/" + head.getModuleName() + ".dcp");
 		merger.setFinalDCP(out_dcp);
 		merger.writeCheckpoint(out_dcp);
-		// TODO DesignUtils.copyConstrsFileIntoDCP(src_constrs, dest_dcp, verbose, dir)
-		// TODO remove this 'if'
-		// if (out_dcp.getName().startsWith("design_2_wrapper"))
-		// DesignUtils.copyConstrsFileIntoDCP(
-		// new File(head.getIII().getParentFile(), "tut2_proj1_constrs_1_no_flags.xdc"),
-		// // new
-		// //
-		// File("/thesis0/pc2019/Igi/shell/pieces/tut2/project_1/project_1.srcs/constrs_1/imports/new/microblaze.xdc"),
-		// new File(head.getIII(), "moduleCache/design_2_wrapper/design_2_wrapper.dcp"),
-		// head.isVerbose(), head.getIII());
 
-		// TODO remove this 'if'
-		// if (out_dcp.getName().startsWith("design_1_wrapper"))
-		// if (head.getParent() == null) // ! only run if top level module?
-		merger.placeAndRoute(out_dcp, head, args); // keep this
+		// if (head.getParent() == null) 
+		
+		// ! only run if top level module?
+		// TODO is it still placing and routing both here and when the design is loaded as an ooc dcp
+		merger.placeAndRoute(out_dcp, head, args);
 
 		// Get dcp of last directive if it was a write
 		File write_dcp = null;
@@ -231,17 +221,22 @@ public class ShellBuilder {
 			directive_builder.getHeader().setRefresh(true);
 
 		// TODO remove this test
-		File input_dcp = new File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
-				"xml_final_all_green_placement.dcp");
-		File output_dcp = new File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
-				"../ila_out/tut2_with_ila.dcp");
-		ILAAdder.testAddILA(input_dcp, output_dcp, directive_builder.getHeader(), args);
-		
+		// it added an ila to the tutorial 2 project
+		// File input_dcp = new
+		// File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
+		// "xml_final_all_green_placement.dcp");
+		// File output_dcp = new
+		// File(directive_builder.getHeader().fsys().getRoot(FileSys.FILE_ROOT.OUT),
+		// "../ila_out/tut2_with_ila.dcp");
+		// ILAAdder.testAddILA(input_dcp, output_dcp, directive_builder.getHeader(),
+		// args);
+
+		runTemplateBuilder(directive_builder);
+
 		XDCWriter xdc_writer = new XDCWriter(args, true);
 		for (Directive dir : directive_builder.getDirectives())
 			xdc_writer.writeAllHierXDC(dir);
 
-		runTemplateBuilder(directive_builder);
 		if (!directive_builder.getDirectives().isEmpty())
 			runBuilder(directive_builder);
 

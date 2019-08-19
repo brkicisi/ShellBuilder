@@ -4,7 +4,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -21,21 +23,38 @@ import main.parser.XMLParser.BaseEnum;
 import main.parser.XMLParser.KEY;
 import main.parser.XMLParser.TAG;
 import main.util.DesignUtils;
+import main.worker.FileSys;
 
 /**
  * Writes xml builder template from imput dcp.
  */
 public class DirectiveWriter {
 	boolean verbose = false;
+	DirectiveHeader head = null;
 	boolean include_primitives = false;
 
-	DirectiveWriter(boolean verbose, boolean include_primitives) {
-		this.verbose = verbose;
+	String iii_dir = "";
+	String ooc_dir = "";
+	String out_dir = "";
+
+	DirectiveWriter(DirectiveHeader head, boolean include_primitives) {
+		this.verbose = head.isVerbose();
+		this.head = head;
 		this.include_primitives = include_primitives;
+
+		File dir = head.getIII();
+		iii_dir = (dir == null) ? "" : dir.getAbsolutePath();
+		dir = head.fsys().getRoot(FileSys.FILE_ROOT.OOC);
+		ooc_dir = (dir == null) ? "" : dir.getAbsolutePath();
+		dir = head.fsys().getRoot(FileSys.FILE_ROOT.OUT);
+		out_dir = (dir == null) ? "" : dir.getAbsolutePath();
 	}
 
 	/**
 	 * Write an xml builder template from an input_dcp.
+	 * <p>
+	 * Warning: The generated builder may have filled in fields incorrectly and/or
+	 * not inserted values for other fields (particularly dcps and pblocks).
 	 * 
 	 * @param input_dcp          Dcp to use as template.
 	 * @param include_primitives Write primitive blocks into template.
@@ -44,14 +63,16 @@ public class DirectiveWriter {
 	 * @param dir                Temp dir to write tcl file to if required
 	 *                           (suggested: iii dir).
 	 */
-	public static void writeTemplate(File input_dcp, boolean include_primitives, File output_xml, boolean verbose,
-			File dir) {
-		writeTemplate(input_dcp.getAbsolutePath(), include_primitives, output_xml.getAbsolutePath(), verbose,
-				dir.getAbsolutePath());
+	public static void writeTemplate(File input_dcp, boolean include_primitives, File output_xml,
+			DirectiveHeader head) {
+		writeTemplate(input_dcp.getAbsolutePath(), include_primitives, output_xml.getAbsolutePath(), head);
 	}
 
 	/**
 	 * Write an xml builder template from an input_dcp.
+	 * <p>
+	 * Warning: The generated builder may have filled in fields incorrectly and/or
+	 * not inserted values for other fields (particularly dcps and pblocks).
 	 * 
 	 * @param input_dcp          Dcp to use as template.
 	 * @param include_primitives Write primitive blocks into template.
@@ -60,13 +81,14 @@ public class DirectiveWriter {
 	 * @param dir                Temp dir to write tcl file to if required
 	 *                           (suggested: iii dir).
 	 */
-	public static void writeTemplate(String input_dcp, boolean include_primitives, String output_xml, boolean verbose,
-			String dir) {
-		if (verbose)
+	public static void writeTemplate(String input_dcp, boolean include_primitives, String output_xml,
+			DirectiveHeader head) {
+
+		if (head.isVerbose())
 			MessageGenerator.briefMessage("\nStarting to construct template with input '" + input_dcp + "'.");
 
-		Design design = DesignUtils.safeReadCheckpoint(input_dcp, verbose, dir);
-		DirectiveWriter dw = new DirectiveWriter(verbose, include_primitives);
+		Design design = DesignUtils.safeReadCheckpoint(input_dcp, head.isVerbose(), head.getIII());
+		DirectiveWriter dw = new DirectiveWriter(head, include_primitives);
 		EDIFCellInst top_ci = design.getNetlist().getTopCellInst();
 
 		// Construct template
@@ -80,9 +102,9 @@ public class DirectiveWriter {
 		for (TAG t : top.children())
 			if (t.key.equals(DirectiveHeader.header.key)) {
 				List<TAG> header_children = new ArrayList<>(t.children());
-				header_children.add(new WrLeaf(HEADER.iii_dir.key, ""));
-				header_children.add(new WrLeaf(HEADER.ooc_dir.key, ""));
-				header_children.add(new WrLeaf(HEADER.out_dir.key, ""));
+				header_children.add(new WrLeaf(HEADER.iii_dir.key, dw.iii_dir));
+				header_children.add(new WrLeaf(HEADER.ooc_dir.key, dw.ooc_dir));
+				header_children.add(new WrLeaf(HEADER.out_dir.key, dw.out_dir));
 				children.add(new WrNode(t.key, header_children, t.attributes()));
 			} else if (t.key.equals(Directive.inst.key))
 				children.add(t);
@@ -90,7 +112,7 @@ public class DirectiveWriter {
 		children.add(dw.constructWrite());
 
 		WrNode root = new WrNode("root", children, null);
-		if (verbose)
+		if (head.isVerbose())
 			MessageGenerator.briefMessage("\nWriting build template to '" + output_xml + "'.");
 		root.write(output_xml);
 	}
@@ -103,15 +125,6 @@ public class DirectiveWriter {
 	 * @return Node representing ci and it's descendants.
 	 */
 	WrNode constructInst(EDIFCellInst ci) {
-		List<TAG> children = new ArrayList<>();
-		List<KEY> attributes = new ArrayList<>();
-		String key = Directive.inst.key;
-
-		attributes.add(new WrKey(INST.type.key, INST.TYPE.TypeEnum.MERGE));
-		children.add(new WrLeaf(INST.inst_name.key, ci.getName()));
-		children.add(new WrLeaf(INST.dcp.key, ""));
-		children.add(new WrLeaf(INST.pblock.key, ""));
-
 		// TODO check this
 		// I've only seen ci.isBlackBox() == false and ci.getCellType().getCellInsts()
 		// != null
@@ -131,7 +144,66 @@ public class DirectiveWriter {
 			// System.out.println("End : " + ci.getName() + " - " + ci.getCellName());
 		}
 
+		List<TAG> children = new ArrayList<>();
+		List<KEY> attributes = new ArrayList<>();
+		String key = Directive.inst.key;
+
+		attributes.add(new WrKey(INST.type.key, INST.TYPE.TypeEnum.MERGE));
+		children.add(new WrLeaf(INST.inst_name.key, ci.getName()));
+		children.add(newDCP(ci));
+		children.add(new WrLeaf(INST.pblock.key, ""));
+
 		return new WrNode(key, children, attributes);
+	}
+
+	/**
+	 * Create a leaf that represents the cell.
+	 * 
+	 * @param ci Cell instance to represent.
+	 * @return A leaf representing the cell instance using the best guess for the
+	 *         dcp from {@link #getCellInstDCP}.
+	 */
+	private WrLeaf newDCP(EDIFCellInst ci) {
+		String dcp = getCellInstDCP(ci);
+		if (!ooc_dir.equals("") && dcp.startsWith(ooc_dir + "/")) {
+			List<KEY> attributes = Arrays.asList(new WrKey(FILE.loc.key, FILE.LOC.LocEnum.OOC));
+			dcp = dcp.substring(ooc_dir.length() + 1);
+			return new WrLeaf(INST.dcp.key, attributes, dcp);
+		}
+		new WrLeaf(INST.dcp.key, dcp);
+		return null;
+	}
+
+	/**
+	 * Try to find the corresponding dcp for this cell instance.
+	 * 
+	 * @param ci Cell instance to find ooc dcp of.
+	 * @return A string representing the best guess for which dcp under ooc_dir
+	 *         represents the cell instance.
+	 */
+	private String getCellInstDCP(EDIFCellInst ci) {
+		File ooc_dir = head.fsys().getRoot(FileSys.FILE_ROOT.OOC);
+		if (ooc_dir == null || !ooc_dir.isDirectory())
+			return "";
+
+		File[] possible_dirs = ooc_dir
+				.listFiles(FileTools.getFilenameFilter("(.*)" + ci.getCellType().getName() + "(.*)"));
+		Queue<File> possible_dcps = new LinkedList<>();
+		for (File dir : possible_dirs) {
+			if (!dir.isDirectory())
+				continue;
+			File[] dir_dcps = dir.listFiles(FileTools.getDCPFilenameFilter());
+			if (dir_dcps.length < 1)
+				continue;
+			possible_dcps.add(dir_dcps[0]);
+		}
+
+		String shortest = "";
+		int shortest_length = Integer.MAX_VALUE;
+		for (File dcp : possible_dcps)
+			if (dcp.getAbsolutePath().length() < shortest_length)
+				shortest = dcp.getAbsolutePath();
+		return shortest;
 	}
 
 	/**
@@ -202,7 +274,9 @@ public class DirectiveWriter {
 		String key = Directive.inst.key;
 
 		attributes.add(new WrKey(INST.type.key, INST.TYPE.TypeEnum.WRITE));
-		children.add(new WrLeaf(INST.dcp.key, Arrays.asList(new WrKey(FILE.loc.key, FILE.LOC.LocEnum.OUT)), ""));
+		String output_file_name = ((head.getModuleName() == null) ? "default" : head.getModuleName()) + "_out.dcp";
+		children.add(new WrLeaf(INST.dcp.key, Arrays.asList(new WrKey(FILE.loc.key, FILE.LOC.LocEnum.OUT)),
+				output_file_name));
 
 		return new WrNode(key, children, attributes);
 	}
@@ -293,7 +367,7 @@ public class DirectiveWriter {
 
 		@Override
 		void toLines(List<String> lines, String indentation) {
-			if(data == null && attributes().isEmpty()){
+			if (data == null && attributes().isEmpty()) {
 				lines.add(indentation + "<" + key + "/>");
 				return;
 			}
@@ -341,6 +415,9 @@ public class DirectiveWriter {
 
 		/**
 		 * Write this build template.
+		 * <p>
+		 * Warning: The generated builder may have filled in fields incorrectly and/or
+		 * not inserted values for other fields (particularly dcps and pblocks).
 		 * 
 		 * @param args_force Force overwrite file.
 		 */
@@ -355,7 +432,7 @@ public class DirectiveWriter {
 					MessageGenerator.briefErrorAndExit("Use force (-f) or <force> to overwrite.\nExiting.\n");
 				}
 			}
-			DirectiveWriter.writeTemplate(dcp, include_primitives, out, head.isVerbose(), head.getIII());
+			DirectiveWriter.writeTemplate(dcp, include_primitives, out, head);
 		}
 	}
 
@@ -369,7 +446,7 @@ public class DirectiveWriter {
 		public static final TAG force = new TAG("force");
 
 		TEMPLATE() {
-			super("template", Arrays.asList(dcp, out, include_primitives), Arrays.asList());
+			super("template", Arrays.asList(dcp, out, include_primitives, force), Arrays.asList());
 		}
 	}
 
