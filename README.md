@@ -5,7 +5,7 @@ Builds a shell.
 
 Main worker is main.top.ShellBuilder
 
-More documentation in [documentation.md](documentation.md).
+More documentation and links to RapidWright documentation in [documentation.md](documentation.md).
 
 ## About
 
