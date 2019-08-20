@@ -32,7 +32,7 @@ To fix this,
      - Note: I am not sure if the data zip is needed internally by RapidWright. I never reference it explicitly.
    - Extract zips.
 
-1. Link jars to project.
+2. Link jars to project.
 
    - Open `ShellBuilder/.classpath`.
    - Replace filepath before `jars` directories with path to jars folder on your computer.
