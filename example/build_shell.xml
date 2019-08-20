@@ -1,0 +1,119 @@
+<?xml version = "1.0"?>
+<root>
+	<!--
+		This is a filled in template for building tutorial 2
+
+		The start - end show added lines.
+		The pblocks were filled in and the output dcp was given a new name.
+	-->
+	<header>
+		<module_name>design_2_wrapper</module_name>
+		<iii_dir>../pieces/.iii</iii_dir>
+		<ooc_dir>../pieces/tutorial2/tutorial2.runs</ooc_dir>
+		<out_dir>../pieces/out</out_dir>
+		<!-- start -->
+		<buffer_inputs/>
+		<proj loc = "ooc">../tutorial2.xpr</proj>
+		<initial loc = "ooc">synth_1/design_2_wrapper.dcp</initial>
+		<!-- end -->
+	</header>
+	<inst type = "build">
+		<iname>design_2_i</iname>
+		<header>
+			<module_name>design_2</module_name>
+			<!-- start -->
+			<synth loc = "ooc">synth_1/design_2_wrapper.dcp</synth>
+			<!-- end -->
+		</header>
+		<inst type = "merge">
+			<iname>axi_uartlite_0</iname>
+			<dcp loc = "ooc">design_2_axi_uartlite_0_0_synth_1/design_2_axi_uartlite_0_0.dcp</dcp>
+			<pblock>SLICE_X12Y41:SLICE_X19Y45</pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>clk_wiz_1</iname>
+			<dcp loc = "ooc">design_2_clk_wiz_1_1_synth_1/design_2_clk_wiz_1_1.dcp</dcp>
+			
+		</inst>
+		<inst type = "merge">
+			<iname>gpio_led</iname>
+			<dcp loc = "ooc">design_2_axi_gpio_0_0_synth_1/design_2_axi_gpio_0_0.dcp</dcp>
+			<pblock>SLICE_X12Y48:SLICE_X19Y49</pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>gpio_switch</iname>
+			<dcp loc = "ooc">design_2_axi_gpio_0_1_synth_1/design_2_axi_gpio_0_1.dcp</dcp>
+			<pblock>SLICE_X12Y46:SLICE_X19Y47</pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>mdm_1</iname>
+			<dcp loc = "ooc">design_2_mdm_1_1_synth_1/design_2_mdm_1_1.dcp</dcp>
+			<pblock>SLICE_X0Y26:SLICE_X7Y29</pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>microblaze_0</iname>
+			<dcp loc = "ooc">design_2_microblaze_0_1_synth_1/design_2_microblaze_0_1.dcp</dcp>
+			<pblock>SLICE_X12Y0:SLICE_X15Y20 SLICE_X0Y30:SLICE_X7Y49 SLICE_X0Y0:SLICE_X7Y25</pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>microblaze_0_axi_intc</iname>
+			<dcp loc = "ooc">design_2_microblaze_0_axi_intc_0_synth_1/design_2_microblaze_0_axi_intc_0.dcp</dcp>
+			<pblock>SLICE_X12Y26:SLICE_X19Y32</pblock>
+		</inst>
+		<inst type = "build">
+			<iname>microblaze_0_axi_periph</iname>
+			<header>
+				<module_name>design_2_microblaze_0_axi_periph_0</module_name>
+			</header>
+			<inst type = "merge">
+				<iname>xbar</iname>
+				<dcp loc = "ooc">design_2_xbar_0_synth_1/design_2_xbar_0.dcp</dcp>
+				<pblock>SLICE_X16Y17:SLICE_X27Y25 SLICE_X12Y21:SLICE_X15Y25</pblock>
+			</inst>
+		</inst>
+		<inst type = "build">
+			<iname>microblaze_0_local_memory</iname>
+			<header>
+				<module_name>microblaze_0_local_memory_imp_MFYM5E</module_name>
+			</header>
+			<inst type = "merge">
+				<iname>dlmb_bram_if_cntlr</iname>
+				<dcp loc = "ooc">design_2_dlmb_bram_if_cntlr_1_synth_1/design_2_dlmb_bram_if_cntlr_1.dcp</dcp>
+				<pblock>SLICE_X12Y38:SLICE_X15Y38</pblock>
+			</inst>
+			<inst type = "merge">
+				<iname>dlmb_v10</iname>
+				<dcp loc = "ooc">design_2_dlmb_v10_1_synth_1/design_2_dlmb_v10_1.dcp</dcp>
+				<pblock>SLICE_X12Y37:SLICE_X15Y37</pblock>
+			</inst>
+			<inst type = "merge">
+				<iname>ilmb_bram_if_cntlr</iname>
+				<dcp loc = "ooc">design_2_ilmb_bram_if_cntlr_1_synth_1/design_2_ilmb_bram_if_cntlr_1.dcp</dcp>
+				<pblock>SLICE_X12Y36:SLICE_X15Y36</pblock>
+			</inst>
+			<inst type = "merge">
+				<iname>ilmb_v10</iname>
+				<dcp loc = "ooc">design_2_ilmb_v10_1_synth_1/design_2_ilmb_v10_1.dcp</dcp>
+				<pblock>SLICE_X12Y35:SLICE_X15Y35</pblock>
+			</inst>
+			<inst type = "merge">
+				<iname>lmb_bram</iname>
+				<dcp loc = "ooc">design_2_lmb_bram_1_synth_1/design_2_lmb_bram_1.dcp</dcp>
+				<pblock>SLICE_X12Y34:SLICE_X15Y34 SLICE_X10Y0:SLICE_X11Y49</pblock>
+			</inst>
+		</inst>
+		<inst type = "merge">
+			<iname>rst_clk_wiz_1_100M</iname>
+			<dcp loc = "ooc">design_2_rst_clk_wiz_1_100M_1_synth_1/design_2_rst_clk_wiz_1_100M_1.dcp</dcp>
+			<pblock>SLICE_X12Y39:SLICE_X15Y40</pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>microblaze_0_xlconcat</iname>
+			<only_wires/>
+		</inst>
+	</inst>
+	<inst type = "write">
+		<force/>
+		<dcp loc = "out">xml_final.dcp</dcp>
+	</inst>
+</root>

@@ -51,6 +51,13 @@ This should output a dcp containing the final placed and routed design. The fina
 
 For the rest of this section I will be describing the method for using ShellBuilder that I have been designing with. There are other ways to use ShellBuilder (different inputs, not using `initial` & `synth`, etc.). Particularly all the stuff with the design wrapper, there are probably other ways to do it, but this seemed simplest to me.
 
+Note: The project that I was testing with and know works is Tutorial 2 from the Vivado Tutorials. The block diagram was named 'design_2' for the example xml files (
+  [generator](example/build_generator_template.xml),
+  [resulting template](example/build_wrapper_template.xml),
+  [filled in template](example/build_shell.xml)
+  ).
+To test bitstream, I used [ILAAdder](src/main/top/worker/ILAAdder.java) which is copied from [AddILA](https://github.com/brkicisi/AddILA).
+
 ### Create a Template Generator
 
 This step is very similar for each project. The simplest option is to fill in the blanks in the following generator. The `dcp` under `template` should be filled in to point to the design wrapper. The `locs` as well as `iii_dir`, `ooc_dir` and `out_dir` are suggested to make writing paths easier. The `*_dir`s will also be copied into the template. Additionally, `ooc_dir` will be used to [infer ooc dcps](#infering-dcps) and used to shorten any paths that it infers. More details on how this works in [TemplateBuilder & DirectiveWriter](#templatebuilder--directivewriter).
@@ -242,7 +249,7 @@ Else the `Directive` is an `inst="merge"`. If the `dcp` is newer than the candid
 
 If the dependancy set is not empty, return not found because the cached dcp was created using more `ModuleInst`s than are specified under this `Directive`.
 
-### Merger#fetchAndPropModule
+### Merger#fetchAndPrepModule
 
 If the directive has the tag `only_wires` cache it to handle later.
 
@@ -256,11 +263,15 @@ Call `Merger#myMigrateCellsAndSubCells` to merge the logical netlist library of 
 
 ### Merger#insertOOC
 
+This function creates an `ModuleInst` from the `Module` that was output from `Merger#fetchAndPrepModule`. It then places the `ModuleInst`.
 
+For details of how it is currently done and future improvements, see [Placing Modules](#placing-modules).
 
 ### Merger#connectAll
 
+This function handles connecting the modules from one level of hierarchy together.
 
+It first creates `ModuleInst`s for all the `only_wire` cells that were cached in [Merger#fetchAndPrepModule](#mergerfetchandprepmodule) by copying their logical nets from the `synth` in the `header`. It then creates logical port instances and nets to connect the Modules of the design (again copying from `synth`).
 
 ## File Types
 

@@ -1,0 +1,107 @@
+<?xml version = "1.0"?>
+<root>
+	<header>
+		<module_name>design_2_wrapper</module_name>
+		<iii_dir>../pieces/.iii</iii_dir>
+		<ooc_dir>../pieces/tutorial2/tutorial2.runs</ooc_dir>
+		<out_dir>../pieces/out</out_dir>
+	</header>
+	<inst type = "build">
+		<iname>design_2_i</iname>
+		<header>
+			<module_name>design_2</module_name>
+		</header>
+		<inst type = "merge">
+			<iname>axi_uartlite_0</iname>
+			<dcp loc = "ooc">design_2_axi_uartlite_0_0_synth_1/design_2_axi_uartlite_0_0.dcp</dcp>
+			<pblock></pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>clk_wiz_1</iname>
+			<dcp loc = "ooc">design_2_clk_wiz_1_1_synth_1/design_2_clk_wiz_1_1.dcp</dcp>
+			<pblock></pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>gpio_led</iname>
+			<dcp loc = "ooc">design_2_axi_gpio_0_0_synth_1/design_2_axi_gpio_0_0.dcp</dcp>
+			<pblock></pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>gpio_switch</iname>
+			<dcp loc = "ooc">design_2_axi_gpio_0_1_synth_1/design_2_axi_gpio_0_1.dcp</dcp>
+			<pblock></pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>mdm_1</iname>
+			<dcp loc = "ooc">design_2_mdm_1_1_synth_1/design_2_mdm_1_1.dcp</dcp>
+			<pblock></pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>microblaze_0</iname>
+			<dcp loc = "ooc">design_2_microblaze_0_1_synth_1/design_2_microblaze_0_1.dcp</dcp>
+			<pblock></pblock>
+		</inst>
+		<inst type = "merge">
+			<iname>microblaze_0_axi_intc</iname>
+			<dcp loc = "ooc">design_2_microblaze_0_axi_intc_0_synth_1/design_2_microblaze_0_axi_intc_0.dcp</dcp>
+			<pblock></pblock>
+		</inst>
+		<inst type = "build">
+			<iname>microblaze_0_axi_periph</iname>
+			<header>
+				<module_name>design_2_microblaze_0_axi_periph_0</module_name>
+			</header>
+			<inst type = "merge">
+				<iname>xbar</iname>
+				<dcp loc = "ooc">design_2_xbar_0_synth_1/design_2_xbar_0.dcp</dcp>
+				<pblock></pblock>
+			</inst>
+		</inst>
+		<inst type = "build">
+			<iname>microblaze_0_local_memory</iname>
+			<header>
+				<module_name>microblaze_0_local_memory_imp_MFYM5E</module_name>
+			</header>
+			<inst type = "merge">
+				<iname>dlmb_bram_if_cntlr</iname>
+				<dcp loc = "ooc">design_2_dlmb_bram_if_cntlr_1_synth_1/design_2_dlmb_bram_if_cntlr_1.dcp</dcp>
+				<pblock></pblock>
+			</inst>
+			<inst type = "merge">
+				<iname>dlmb_v10</iname>
+				<dcp loc = "ooc">design_2_dlmb_v10_1_synth_1/design_2_dlmb_v10_1.dcp</dcp>
+				<pblock></pblock>
+			</inst>
+			<inst type = "merge">
+				<iname>ilmb_bram_if_cntlr</iname>
+				<dcp loc = "ooc">design_2_ilmb_bram_if_cntlr_1_synth_1/design_2_ilmb_bram_if_cntlr_1.dcp</dcp>
+				<pblock></pblock>
+			</inst>
+			<inst type = "merge">
+				<iname>ilmb_v10</iname>
+				<dcp loc = "ooc">design_2_ilmb_v10_1_synth_1/design_2_ilmb_v10_1.dcp</dcp>
+				<pblock></pblock>
+			</inst>
+			<inst type = "merge">
+				<iname>lmb_bram</iname>
+				<dcp loc = "ooc">design_2_lmb_bram_1_synth_1/design_2_lmb_bram_1.dcp</dcp>
+				<pblock></pblock>
+			</inst>
+		</inst>
+		<inst type = "merge">
+			<iname>microblaze_0_xlconcat</iname>
+			<header>
+				<module_name>design_2_microblaze_0_xlconcat_0</module_name>
+			</header>
+			<only_wires/>
+		</inst>
+		<inst type = "merge">
+			<iname>rst_clk_wiz_1_100M</iname>
+			<dcp loc = "ooc">design_2_rst_clk_wiz_1_100M_1_synth_1/design_2_rst_clk_wiz_1_100M_1.dcp</dcp>
+			<pblock></pblock>
+		</inst>
+	</inst>
+	<inst type = "write">
+		<dcp loc = "out">default_out.dcp</dcp>
+	</inst>
+</root>

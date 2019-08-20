@@ -1,0 +1,13 @@
+<?xml version = "1.0"?>
+<root>
+	<template>
+		<header>
+			<iii_dir>../pieces/.iii</iii_dir>
+			<ooc_dir>../pieces/tutorial2/tutorial2.runs</ooc_dir>
+			<out_dir>../pieces/out</out_dir>
+		</header>
+		<dcp loc = "ooc">synth_1/design_2_wrapper.dcp</dcp>
+		<out loc = "out">wrapper_template.xml</out>
+		<force></force>
+	</template>
+</root>
