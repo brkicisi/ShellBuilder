@@ -170,8 +170,7 @@ public class DirectiveWriter {
 			dcp = dcp.substring(ooc_dir.length() + 1);
 			return new WrLeaf(INST.dcp.key, attributes, dcp);
 		}
-		new WrLeaf(INST.dcp.key, dcp);
-		return null;
+		return new WrLeaf(INST.dcp.key, dcp);
 	}
 
 	/**
@@ -246,6 +245,8 @@ public class DirectiveWriter {
 			if (all_primitive) {
 				attributes.add(new WrKey(INST.type.key, INST.TYPE.TypeEnum.MERGE));
 				children.add(new WrLeaf(INST.inst_name.key, ci.getName()));
+				
+				// TODO don't include header if only_wires?
 				children.add(contructHeader(ci));
 				children.add(new WrLeaf(INST.only_wires.key));
 				return new WrNode(key, children, attributes);
@@ -401,11 +402,16 @@ public class DirectiveWriter {
 		 * @param elem Element to parse.
 		 * @param head Header includes data and fsys to resolve files against.
 		 */
-		TemplateBuilder(Element elem, DirectiveHeader head) {
-			this.head = head;
-
-			if (elem == null)
+		TemplateBuilder(Element elem, DirectiveHeader parent_head) {
+			if (elem == null) {
+				this.head = parent_head;
 				return;
+			}
+			boolean verbose = (parent_head == null) ? false : parent_head.isVerbose();
+			head = new DirectiveHeader(parent_head, verbose);
+			Queue<Element> header_children = XMLParser.getChildElementsFromTagName(elem, DirectiveHeader.header.key);
+			if (!header_children.isEmpty())
+				head.addHeader(header_children.peek());
 
 			include_primitives = XMLParser.getFirstBool(elem, TEMPLATE.include_primitives);
 			force = XMLParser.getFirstBool(elem, TEMPLATE.force);

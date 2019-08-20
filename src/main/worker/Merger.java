@@ -648,18 +648,18 @@ public class Merger {
 		printIfVerbose("Finding all valid placements for module '" + mod.getName() + "'",
 				directive.getHeader().isVerbose());
 		List<Site> valid_placements = mi.getAllValidPlacements();
-		int avg_pblock_row = 0, avg_pblock_col = 0;
+		int left_pblock_row = 0, bot_pblock_col = 0;
 		// if (directive.getPBlockStr() != null) {
 		// PBlock block = new PBlock(device, directive.getPBlockStr());
 		// int count = 0;
 		// for (Tile t : block.getAllTiles()) {
-		// avg_pblock_col += t.getColumn();
-		// avg_pblock_row += t.getRow();
+		// bot_pblock_col += t.getColumn();
+		// left_pblock_row += t.getRow();
 		// count++;
 		// }
 		// if (count > 0) {
-		// avg_pblock_col /= count;
-		// avg_pblock_row /= count;
+		// bot_pblock_col /= count;
+		// left_pblock_row /= count;
 		// }
 		// } else if (directive.isSubBuilder()) {
 		// int count = 0;
@@ -667,28 +667,28 @@ public class Merger {
 		// if (dir.getPBlockStr() != null) {
 		// PBlock block = new PBlock(device, dir.getPBlockStr());
 		// for (Tile t : block.getAllTiles()) {
-		// avg_pblock_col += t.getColumn();
-		// avg_pblock_row += t.getRow();
+		// bot_pblock_col += t.getColumn();
+		// left_pblock_row += t.getRow();
 		// count++;
 		// }
 		// }
 		// }
 		// if (count > 0) {
-		// avg_pblock_col /= count;
-		// avg_pblock_row /= count;
+		// bot_pblock_col /= count;
+		// left_pblock_row /= count;
 		// }
 		// }
 		Point p = getAnchorTarget(directive);
 		if (p != null) {
-			avg_pblock_col = p.x;
-			avg_pblock_row = p.y;
+			bot_pblock_col = p.x;
+			left_pblock_row = p.y;
 		}
 
 		int min_manhattan_distance = Integer.MAX_VALUE;
 		for (Site s : valid_placements) {
 			Tile t = s.getTile();
-			int distance = java.lang.Math.abs(t.getRow() - avg_pblock_row)
-					+ java.lang.Math.abs(t.getColumn() - avg_pblock_col);
+			int distance = java.lang.Math.abs(t.getRow() - left_pblock_row)
+					+ java.lang.Math.abs(t.getColumn() - bot_pblock_col);
 			if (mod.isValidPlacement(s, device, design) && distance < min_manhattan_distance) {
 				anchor_site = s;
 				min_manhattan_distance = distance;

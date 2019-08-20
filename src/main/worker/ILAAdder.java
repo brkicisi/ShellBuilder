@@ -34,6 +34,14 @@ import main.util.StringUtils;
 
 public class ILAAdder {
 
+	/**
+	 * Main workflow for adding an ILA (derived from AddILA#start), but hardcoded to a specific example.
+	 * 
+	 * @param input_dcp
+	 * @param output_dcp
+	 * @param head
+	 * @param args
+	 */
 	public static void testAddILA(File input_dcp, File output_dcp, DirectiveHeader head, ArgsContainer args) {
 		// TODO remove this test
 		// Design d = DesignUtils.safeReadCheckpoint(input_dcp, head.isVerbose(),
@@ -89,7 +97,7 @@ public class ILAAdder {
 		if (pblock_name != null && pblock_str != null && debug_top != null) {
 			script.addCustomCmd("create_pblock " + pblock_name);
 			// script.addCustomCmd(
-			// 		"resize_pblock -add {" + pblock_str + "} [get_pblocks " + pblock_name + "]");
+			// "resize_pblock -add {" + pblock_str + "} [get_pblocks " + pblock_name + "]");
 			script.addCustomCmd("add_cells_to_pblock [get_pblocks " + pblock_name + "] [get_cells " + debug_top + "]");
 			script.addCustomCmd("set_property CONTAIN_ROUTING 1 [get_pblocks " + pblock_name + "]");
 			script.addCustomCmd("set_property SNAPPING_MODE ROUTING [get_pblocks " + pblock_name + "]");
