@@ -16,6 +16,8 @@ For more general information about RapidWright see the [RapidWright](https://www
 
 [JavaDocs](https://www.rapidwright.io/javadoc/index.html) for RapidWright.
 
+Link to [ShellBuilder](https://github.com/brkicisi/ShellBuilder) GitHub.
+
 To generate offline JavaDocs for ShellBuilder
 
 `javadoc -sourcepath <path to ShellBuilder>/ShellBuilder/src -subpackages main -noqualifier java.lang:java.util:java.io -d docs -verbose -windowtitle ShellBuilder > docs.log`
