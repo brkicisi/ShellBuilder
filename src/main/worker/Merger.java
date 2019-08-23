@@ -655,10 +655,10 @@ public class Merger {
 
 		List<Site> valid_placements = new ArrayList<Site>();
 		// TODO verify that storing and loading placements succeeds properly
-		// loadValidSitesFromMeta(valid_placements, directive);
+		// loadValidSitesFromMeta(valid_placements, directive, device);
 		if (valid_placements.size() <= 0) {
-			printIfVerbose("No valid placements found in metadata. Finding all valid placements for module '" + mod.getName() + "'",
-					directive.getHeader().isVerbose());
+			printIfVerbose("No valid placements found in metadata. Finding all valid placements for module '"
+					+ mod.getName() + "'", directive.getHeader().isVerbose());
 			valid_placements = mi.getAllValidPlacements();
 			// writeValidSitesToMeta(valid_placements, directive);
 		}
@@ -747,8 +747,16 @@ public class Merger {
 		return mi;
 	}
 
-	@SuppressWarnings("unused")
-	private void loadValidSitesFromMeta(List<Site> valid_placements, Directive directive) {
+	/**
+	 * Read in the sites that have been stored as valid sites in the metadata file.
+	 * 
+	 * @param valid_placements Append valid placements retrieved from metadata to
+	 *                         this list.
+	 * @param directive        The module to which the metadata belongs.
+	 * @param device           Device for the design. Used to parse strings into
+	 *                         Sites.
+	 */
+	public static void loadValidSitesFromMeta(List<Site> valid_placements, Directive directive, Device device) {
 		File impl_dir = XDCWriter.findOrMakeCacheDir(directive, null);
 		File metadata = new File(impl_dir, DependancyMeta.META_FILENAME);
 
@@ -768,8 +776,16 @@ public class Merger {
 		}
 	}
 
-	@SuppressWarnings("unused")
-	private void writeValidSitesToMeta(List<Site> valid_placements, Directive directive) {
+	/**
+	 * Append a list of Sites to a metadata file.
+	 * <p>
+	 * To do this, the metadata file is read in, then overwritten with the loaded
+	 * results plus the valid_placements.
+	 * 
+	 * @param valid_placements Write this list of placements to the metadata.
+	 * @param directive        The module to which the metadata belongs.
+	 */
+	public static void writeValidSitesToMeta(List<Site> valid_placements, Directive directive) {
 		File impl_dir = XDCWriter.findOrMakeCacheDir(directive, null);
 		File metadata = new File(impl_dir, DependancyMeta.META_FILENAME);
 
