@@ -519,7 +519,9 @@ If the dependancy set is not empty, return not found because the cached dcp was 
 
 ### 4.10 Merger#init
 
+Sets the design and device to be merged into. Must be initialized with a design. If the user does not use `initial` to specify an initial design to merge into, the `Merger` is initialized with an empty design and the device of the first `Module` being merged into the design.
 
+This function also uses the `synth` design (if specified) to copy in top level ports and primative cell instances.
 
 ### 4.11 Merger#fetchAndPrepModule
 
