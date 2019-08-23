@@ -2,11 +2,11 @@
 
 # ShellBuilder Documentation
 
-Construct designs for Xilinx FPGAs sequentially using [RapidWright](https://www.rapidwright.io/).
+Construct designs for Xilinx FPGAs sequentially using [RapidWright][].
 
 Main worker is main.top.ShellBuilder
 
-More documentation and links to RapidWright's documentation in [Additional Reading](#7-additional-reading). Also found there is how to generate JavaDocs for ShellBuilder.
+More documentation and links to RapidWright's documentation in [Additional Reading][]. Also found there is how to generate JavaDocs for ShellBuilder.
 
 ## 1 About
 
@@ -38,64 +38,94 @@ This is limiting in a few cases that RapidWright helps us address.
 
 ## 2 Table of Contents
 
-- [ShellBuilder Documentation](#ShellBuilder-Documentation)
-  - [1 About](#1-About)
-    - [1.1 Description](#11-Description)
-  - [2 Table of Contents](#2-Table-of-Contents)
-  - [3 Using ShellBuilder](#3-Using-ShellBuilder)
-    - [3.1 Downloading ShellBuilder](#31-Downloading-ShellBuilder)
-      - [3.1.1 Jars and Data](#311-Jars-and-Data)
-      - [3.1.2 Command Line](#312-Command-Line)
-      - [3.1.3 Libraries](#313-Libraries)
-    - [3.2 Running ShellBilder](#32-Running-ShellBilder)
-      - [3.2.1 Create a Template Generator](#321-Create-a-Template-Generator)
-      - [3.2.2 Create a Template](#322-Create-a-Template)
-      - [3.2.3 Fill in a Template](#323-Fill-in-a-Template)
-      - [3.2.4 Run Builder](#324-Run-Builder)
-      - [3.2.5 Tags](#325-Tags)
+- [ShellBuilder Documentation](#shellbuilder-documentation)
+  - [1 About](#1-about)
+    - [1.1 Description](#11-description)
+  - [2 Table of Contents](#2-table-of-contents)
+  - [3 Using ShellBuilder](#3-using-shellbuilder)
+    - [3.1 Downloading ShellBuilder](#31-downloading-shellbuilder)
+      - [3.1.1 Jars and Data](#311-jars-and-data)
+      - [3.1.2 Command Line](#312-command-line)
+      - [3.1.3 Libraries](#313-libraries)
+    - [3.2 Running ShellBuilder](#32-running-shellbuilder)
+      - [3.2.1 Create a Template Generator](#321-create-a-template-generator)
+      - [3.2.2 Create a Template](#322-create-a-template)
+      - [3.2.3 Fill in a Template](#323-fill-in-a-template)
+      - [3.2.4 Run Builder](#324-run-builder)
+      - [3.2.5 Tags](#325-tags)
       - [3.2.6 iii_dir, ooc_dir & out_dir](#326-iiidir-oocdir--outdir)
-      - [3.2.7 An XML Example](#327-An-XML-Example)
-  - [4 Code Workflow](#4-Code-Workflow)
-    - [4.1 ShellBuilder#start](#41-ShellBuilderstart)
-    - [4.2 XDCWriter#writeAllHierXDC](#42-XDCWriterwriteAllHierXDC)
-    - [4.3 TemplateBuilder & DirectiveWriter](#43-TemplateBuilder--DirectiveWriter)
-      - [4.3.1 Infering dcps](#431-Infering-dcps)
-    - [4.4 ShellBuilder#runBuilder](#44-ShellBuilderrunBuilder)
-    - [4.5 ShellBuilder#runDirective](#45-ShellBuilderrunDirective)
-    - [4.6 Design classes](#46-Design-classes)
-    - [4.7 Merger#merge](#47-Mergermerge)
-    - [4.8 Cache](#48-Cache)
-    - [4.9 Merger#findModuleInCache](#49-MergerfindModuleInCache)
-    - [4.10 Merger#init](#410-Mergerinit)
-    - [4.11 Merger#fetchAndPrepModule](#411-MergerfetchAndPrepModule)
-    - [4.12 Merger#insertOOC](#412-MergerinsertOOC)
-    - [4.13 Merger#connectAll](#413-MergerconnectAll)
-    - [4.14 Encrypted Modules](#414-Encrypted-Modules)
-  - [5 File Types](#5-File-Types)
-    - [5.1 DCP](#51-DCP)
-    - [5.2 EDIF](#52-EDIF)
-    - [5.3 XDC](#53-XDC)
-    - [5.4 XML Build Directives](#54-XML-Build-Directives)
-    - [5.5 Metadata](#55-Metadata)
-  - [6 Ongoing Issues / Future Work](#6-Ongoing-Issues--Future-Work)
-    - [6.1 PBlock selection](#61-PBlock-selection)
-    - [6.2 Placing Modules](#62-Placing-Modules)
-    - [6.3 Catch failed P&R, try again without read_xdc](#63-Catch-failed-PR-try-again-without-readxdc)
-    - [6.4 ILAs](#64-ILAs)
-    - [6.5 Vivado Version](#65-Vivado-Version)
-  - [7 Additional Reading](#7-Additional-Reading)
-  - [8 Bugs and fixes](#8-Bugs-and-fixes)
-    - [8.1 java.lang.UnsupportedOperationException at ILAInserter#244](#81-javalangUnsupportedOperationException-at-ILAInserter244)
+      - [3.2.7 XML Example](#327-xml-example)
+  - [4 Code Workflow](#4-code-workflow)
+    - [4.1 ShellBuilder#start](#41-shellbuilderstart)
+    - [4.2 XDCWriter#writeAllHierXDC](#42-xdcwriterwriteallhierxdc)
+    - [4.3 TemplateBuilder & DirectiveWriter](#43-templatebuilder--directivewriter)
+      - [4.3.1 Infering DCPs](#431-infering-dcps)
+    - [4.4 ShellBuilder#runBuilder](#44-shellbuilderrunbuilder)
+    - [4.5 ShellBuilder#runDirective](#45-shellbuilderrundirective)
+    - [4.6 Design classes](#46-design-classes)
+    - [4.7 Merger#merge](#47-mergermerge)
+    - [4.8 Cache](#48-cache)
+    - [4.9 Merger#findModuleInCache](#49-mergerfindmoduleincache)
+    - [4.10 Merger#init](#410-mergerinit)
+    - [4.11 Merger#fetchAndPrepModule](#411-mergerfetchandprepmodule)
+    - [4.12 Merger#insertOOC](#412-mergerinsertooc)
+    - [4.13 Merger#connectAll](#413-mergerconnectall)
+    - [4.14 Encrypted Modules](#414-encrypted-modules)
+  - [5 File Types](#5-file-types)
+    - [5.1 DCP](#51-dcp)
+    - [5.2 EDIF](#52-edif)
+    - [5.3 XDC](#53-xdc)
+    - [5.4 XML Build Directives](#54-xml-build-directives)
+    - [5.5 Metadata](#55-metadata)
+  - [6 Ongoing Issues / Future Work](#6-ongoing-issues--future-work)
+    - [6.1 PBlock selection](#61-pblock-selection)
+    - [6.2 Placing Modules](#62-placing-modules)
+    - [6.3 Catch failed P&R, try again without read_xdc](#63-catch-failed-pr-try-again-without-readxdc)
+    - [6.4 ILAs](#64-ilas)
+    - [6.5 Vivado Version](#65-vivado-version)
+  - [7 Additional Reading](#7-additional-reading)
+  - [8 Bugs and fixes](#8-bugs-and-fixes)
+    - [8.1 java.lang.UnsupportedOperationException at ILAInserter#244](#81-javalangunsupportedoperationexception-at-ilainserter244)
+
+<!--
+To bypass the annoying issue of numbers being renamed, I create reference style links for each heading that was used.
+-->
+[Command Line]: #312-command-line
+[Create a Template Generator]: #321-create-a-template-generator
+[Create a Template]: #322-create-a-template
+[Fill in a Template]: #323-fill-in-a-template
+[Run Builder]: #324-run-builder
+[Tags]: #325-tags
+[XML Example]: #327-xml-example
+[Code Workflow]: #4-code-workflow
+[TemplateBuilder & DirectiveWriter]: #43-templatebuilder--directivewriter
+[Infering DCPs]: #431-infering-dcps
+[ShellBuilder#runBuilder]: #44-shellbuilderrunbuilder
+[ShellBuilder#runDirective]: #45-shellbuilderrundirective
+[Merger#findModuleInCache]: #49-mergerfindmoduleincache
+[Merger#init]: #410-mergerinit
+[Merger#fetchAndPrepModule]: #411-mergerfetchandprepmodule
+[Merger#insertOOC]: #412-mergerinsertooc
+[Merger#connectAll]: #413-mergerconnectall
+[Encrypted Modules]: #414-encrypted-modules
+[DCP]: #51-dcp
+[EDIF]: #52-edif
+[XDC]: #53-xdc
+[Metadata]: #55-metadata
+[Placing Modules]: #62-placing-modules
+[Additional Reading]: #7-additional-reading
+
+<!-- end heading references -->
 
 Notes:
 
-ooc = out of context
+OOC = out of context
 
 Java style naming: `PackageName1.PackageName2.ClassName#variableOrFunctionName`
 
 ## 3 Using ShellBuilder
 
-This class should perform the main workflow of this project (see [Code Workflow](#4-code-workflow)).
+This class should perform the main workflow of this project (see [Code Workflow][]).
 
 ### 3.1 Downloading ShellBuilder
 
@@ -105,7 +135,7 @@ This git repository contains a submodule of RapidWright (make sure to clone the 
 
 To fix this,
 
-1. Download RapidWright jars and data from the [Xilinx Github](https://github.com/Xilinx/RapidWright/releases).
+1. Download RapidWright jars and data from the [Xilinx GitHub][RapidWright GitHub Releases].
 
    - Skip this step if you already have the correct jars on your computer.
    - Under version v2019.1.1-beta download `rapidwright_jars.zip` and `rapidwright_data.zip`.
@@ -121,26 +151,26 @@ There seems to be something similar to this in `RapidWright/.travis.yml`.
 
 #### 3.1.2 Command Line
 
-The following is what worked for ILADebug, I have been using [VSCode](https://code.visualstudio.com/) so that I don't need to manage the details of compiling and running a set of Java files. You should be able to do it manually **similar** to what follows (I haven't actually run ShellBuilder from command line). Alternatively, VSCode is free and small and you can find instructions online for how to clone a git reposotory with submodules which you can then open with VSCode and use `.vscode/launch.json` to set run configurations and arguments.
+The following is what worked for ILADebug, I have been using [VSCode][] so that I don't need to manage the details of compiling and running a set of Java files. You should be able to do it manually **similar** to what follows (I haven't actually run ShellBuilder from command line). Alternatively, VSCode is free and small and you can find instructions online for how to clone a git reposotory with submodules which you can then open with VSCode and use `.vscode/launch.json` to set run configurations and arguments.
 
 ShellBuilder can be run like any other Java file. It requires that the RapidWright directory be in the class path as well as $CLASSPATH (which is set/appended to by running rapidwright.tcl).
 
-From the directory containing [README.md](README.md) (this file):
+From the directory containing [README.md][] (this file):
 
 compile: `javac /path/file.java`
 run: `java -cp .:<RapidWright_dir>/RapidWright:$CLASSPATH ShellBuilder <args ...>`
 
-The only mandatory argument to the java call is the path to the xml file to be run. Other arguments may be added as specified by 'help' (force, refresh, quiet, verbose, extra verbose).
+The only mandatory argument to the java call is the path to the XML file to be run. Other arguments may be added as specified by 'help' (force, refresh, quiet, verbose, extra verbose).
 
 Note: Print help using `-h` or `--help`.
 
 #### 3.1.3 Libraries
 
-ShellBuilder calls on Java librarys (JDOM - [org.w3c.dom](https://docs.oracle.com/javase/8/docs/api/index.html?org/w3c/dom/package-summary.html) & [javax.xml.parsers](https://docs.oracle.com/javase/8/docs/api/index.html?javax/xml/parsers/package-summary.html)) to parse the input XML file.
+ShellBuilder calls on Java librarys (JDOM - [org.w3c.dom][] & [javax.xml.parsers][]) to parse the input XML file.
 
 XML must all be enclosed in a top level root. I have used `root` in the example below, but ShellBuilder never checks this tag.
 
-### 3.2 Running ShellBilder
+### 3.2 Running ShellBuilder
 
 The main difference between the ShellBuilder workflow and Vivado is the intermediate caching of placed and routed partial designs.
 
@@ -152,33 +182,29 @@ The workflow in mind when this project was being written was
    - Up to here this is your standard Vivado design flow.
 
 3. Write a simple template generator
-   - See [Create a Template Generator](#321-create-a-template-generator)
+   - See [Create a Template Generator][]
 
 4. Run the template generator using ShellBuilder
-   - See [Create a Template](#322-create-a-template)
+   - See [Create a Template][]
 
 5. Fill in the template
-   - See [Fill in a Template](#323-fill-in-a-template)
+   - See [Fill in a Template][]
 
 6. Run the builder
-   - See [Run Builder](#324-run-builder)
+   - See [Run Builder][]
 
-This should output a dcp containing the final placed and routed design. The final design should be the parallel to having run implementation in Vivado.
+This should output a DCP containing the final placed and routed design. The final design should be the parallel to having run implementation in Vivado.
 
 For the rest of this section I will be describing the method for using ShellBuilder that I have been designing with. There are other ways to use ShellBuilder (different inputs, not using `initial` & `synth`, etc.). Particularly all the stuff with the design wrapper, there are probably other ways to do it, but this seemed simplest to me.
 
-Note: The project that I was testing with and know works is Tutorial 2 from the Vivado Tutorials. The block diagram was named 'design_2' for the example xml files (
-  [generator](example/build_generator_template.xml),
-  [resulting template](example/build_wrapper_template.xml),
-  [filled in template](example/build_shell.xml)
-  ).
-To test bitstream, I used [ILAAdder](src/main/worker/ILAAdder.java) which is copied from [AddILA](https://github.com/brkicisi/AddILA).
+Note: The project that I was testing with and know works is Tutorial 2 from the Vivado Tutorials. The block diagram was named 'design_2' for the example XML files ([generator][ex xml generator], [resulting template][ex xml template], [filled in template][ex xml filled]).
+To test a bitstream, I used [ILAAdder][] which is copied from [AddILA][].
 
 #### 3.2.1 Create a Template Generator
 
-This step is very similar for each project. The simplest option is to fill in the blanks in the following generator. The `dcp` under `template` should be filled in to point to the design wrapper. The `locs` as well as `iii_dir`, `ooc_dir` and `out_dir` are suggested to make writing paths easier. The `*_dir`s will also be copied into the template. Additionally, `ooc_dir` will be used to [infer ooc dcps](#431-infering-dcps) and used to shorten any paths that it infers. More details on how this works in [TemplateBuilder & DirectiveWriter](#43-templatebuilder--directivewriter).
+This step is very similar for each project. The simplest option is to fill in the blanks in the following generator. The `dcp` under `template` should be filled in to point to the design wrapper. The `locs` as well as `iii_dir`, `ooc_dir` and `out_dir` are suggested to make writing paths easier. The `*_dir`s will also be copied into the template. Additionally, `ooc_dir` will be used to [infer OOC DCPs][Infering DCPs] and used to shorten any paths that it infers. More details on how this works in [TemplateBuilder & DirectiveWriter][].
 
-Other options are allowed as specified in [tags](#325-tags). Also see [Example](#327-an-xml-example).
+Other options are allowed as specified in [Tags][]. Also see [XML Example][].
 
 ```xml
 <?xml version = "1.0"?>
@@ -199,15 +225,15 @@ Note: Template generators may be included in the same files as shell builders. I
 
 #### 3.2.2 Create a Template
 
-Pass the template generator you have just written as the xml argument to the ShellBuilder.
+Pass the template generator you have just written as the XML argument to the ShellBuilder.
 
-See [Command Line](#312-command-line) for how to run ShellBuilder.
+See [Command Line][] for how to run ShellBuilder.
 
 #### 3.2.3 Fill in a Template
 
-Running ShellBuilder in the previous step will have generated a file that describes the dcp file input as best it can. If `ooc_dir` is also set, then the dcps for basic modules will be guessed at with the assumption that `dcp` points to the design wrapper and `ooc_dir` is set to `<proj_dir>/<proj_name>.runs`.
+Running ShellBuilder in the previous step will have generated a file that describes the DCP file input as best it can. If `ooc_dir` is also set, then the DCPs for basic modules will be guessed at with the assumption that `dcp` points to the design wrapper and `ooc_dir` is set to `<proj_dir>/<proj_name>.runs`.
 
-You must now fill in any missing dcps. It is recommended that you check that the ones that were infered are correct. Some of the missing dcps may be from leaf `inst="merge"` that have no internal cells (besides primative leaf cells) and wires. These cells might not have an associated dcp. If they don't, they should instead be given the tag `only_wires`.
+You must now fill in any missing DCPs. It is recommended that you check that the ones that were infered are correct. Some of the missing DCPs may be from leaf `inst="merge"` that have no internal cells (besides primative leaf cells) and wires. These cells might not have an associated DCP. If they don't, they should instead be given the tag `only_wires`.
 
 You may optionally set a pblock constraint for each `inst="build"` and `inst="merge"`. If this is set, then that hierarchial module of the design will be placed and routed within the pblock.
 
@@ -215,19 +241,19 @@ By the workflow that was tested, you should also add an `initial` and `proj` tag
 
 If your highest level design is not an out of context module, you should add `buffer_inputs` to the highest level header.
 
-You may want to add `hand_placer` to one or more of the headers. This will invoke RapidWright's HandPlacer, a GUI window which allows you to interactively drag around module blocks to determine placement. Otherwise, ShellBuilder's placement algorithm will try to place modules near their (or their submodule's) pblocks (see [Placing Modules](#62-placing-modules)).
+You may want to add `hand_placer` to one or more of the headers. This will invoke RapidWright's HandPlacer, a GUI window which allows you to interactively drag around module blocks to determine placement. Otherwise, ShellBuilder's placement algorithm will try to place modules near their (or their submodule's) pblocks (see [Placing Modules][]).
 
 If you want to refresh part of the design (perhaps you want to use HandPlacer where as before you used default placement), there are two places `refresh` can be added. If `refresh` is within a `header`, all submodules that this is a `header` to (sibling `inst`s) will be recursively refreshed. Instead, `refresh` can be added to an `inst="build"` to not refresh submodules, only to go through placement of this `inst` again.
 
-Optionally you may add other parameters specified in [tags](#325-tags).
+Optionally you may add other parameters specified in [Tags][].
 
-For more details see [TemplateBuilder & DirectiveWriter](#43-templatebuilder--directivewriter)
+For more details see [TemplateBuilder & DirectiveWriter][].
 
 #### 3.2.4 Run Builder
 
-Pass the filled in template you have just written as the xml argument to the ShellBuilder. If you made a mistake or the program doesn't succeed, you can edit the filled in template and try again (there is no need to go back to the generate template step).
+Pass the filled in template you have just written as the XML argument to the ShellBuilder. If you made a mistake or the program doesn't succeed, you can edit the filled in template and try again (there is no need to go back to the generate template step).
 
-See [Command Line](#312-command-line) for how to run ShellBuilder.
+See [Command Line][] for how to run ShellBuilder.
 
 #### 3.2.5 Tags
 
@@ -239,24 +265,24 @@ The exception to the above rule is `inst` which will be repeated many times (onc
 | :---- | :------------------- | :----------- | :----------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1     | `header`             | 1.?          |              | Parent to metadata which is common for all `inst`s and `template`s that are siblings to this `header`.                                                                            |
 | 1.1   | `iii_dir`            |              |              | Working directory to save intermediate designs as well as temporary files.                                                                                                        |
-| 1.2   | `ooc_dir`            |              |              | Directory containing ooc dcps.                                                                                                                                                    |
+| 1.2   | `ooc_dir`            |              |              | Directory containing OOC DCPs.                                                                                                                                                    |
 | 1.3   | `out_dir`            |              |              | Output directory.                                                                                                                                                                 |
-| 1.4   | `initial`            |              | `loc` (opt)  | Use this dcp as the base design to the `Merger`. Add all descendant modules to this design.                                                                                       |
-| 1.5   | `synth`              |              | `loc` (opt)  | Use this dcp as a template from which to copy nets when connecting the modules in this level of hierarchy (and descendant levels unless alternative `synth` specified).           |
+| 1.4   | `initial`            |              | `loc` (opt)  | Use this DCP as the base design to the `Merger`. Add all descendant modules to this design.                                                                                       |
+| 1.5   | `synth`              |              | `loc` (opt)  | Use this DCP as a template from which to copy nets when connecting the modules in this level of hierarchy (and descendant levels unless alternative `synth` specified).           |
 | 1.6   | `module_name`        |              |              | Sets name of hierarchial module constructed by the build instruction this `header` is part of (spaces will be replaced with underscores).                                         |
 | 1.7   | `refresh`            |              |              | Place and route all descendant modules ignoring and overwriting cached results.                                                                                                   |
 | 1.8   | `hand_placer`        |              |              | Open RapidWright's HandPlacer to allow user to interactively place all descendant modules in this build. To finish and accept HandPlacer placement close it using the 'X' button. |
-| 1.9   | `buffer_inputs`      |              |              | Indicates to ShellBuilder that this build should be a normal dcp (not an out of context dcp which is default).                                                                    |
+| 1.9   | `buffer_inputs`      |              |              | Indicates to ShellBuilder that this build should be a normal DCP (not an out of context DCP which is default).                                                                    |
 | 1.10  | `proj`               |              | `loc` (opt)  | Use this project file to write constraints for each cell.                                                                                                                         |
 |       |                      |              |
 | 2     | `inst`               | 1, 2, 2.?, 3 | `type` (req) | Instance of an instruction of the given type.                                                                                                                                     |
-| 2.1   | `dcp`                |              | `loc` (opt)  | Specify location of an input (`type="merge"`) or output (`type="write"`) dcp file.                                                                                                |
+| 2.1   | `dcp`                |              | `loc` (opt)  | Specify location of an input (`type="merge"`) or output (`type="write"`) DCP file.                                                                                                |
 | 2.2   | `pblock`             |              |              | String representing pblock to place and route current design into. Space separated list of pblock ranges.                                                                         |
 | 2.3   | `iname`              |              |              | Name to give this instance of the design (`ModuleInst` name).                                                                                                                     |
 | 2.4   | `force`              |              |              | Force overwrite of file specified by `dcp` with for this `write` only.                                                                                                            |
 | 2.5   | `refresh`            |              |              | Place and route this module ignoring and overwriting cached results.                                                                                                              |
 | 2.6   | `hand_placer`        |              |              | Open RapidWright's HandPlacer to allow user to interactively place this module. To finish and accept HandPlacer placement close it using the 'X' button.                          |
-| 2.7   | `only_wires`         |              |              | Indicates that this module contains only nets, pins and ports (thus can't be placed & routed ooc). Copy it from design in 1.5.                                                    |
+| 2.7   | `only_wires`         |              |              | Indicates that this module contains only nets, pins and ports (thus can't be placed & routed OOC). Copy it from design in 1.5.                                                    |
 |       |                      |              |
 | 3     | `template`           | 1, 3.?       |              | Generate a template that can be filled in to build a project                                                                                                                      |
 | 3.1   | `dcp`                |              | `loc` (opt)  | Specify location of the top level wrapper file. You will likely use this file in the generated template as an initial and/or synth file.                                          |
@@ -269,19 +295,19 @@ Note: (req) = required, (opt) = optional. If required, the parser will error if 
 | Attribute | Recognized Values         | Description                                                                                                                                                                                                                    |
 | :-------- | :------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `loc`     | `iii`, `ooc`, `out`       | Specify root to resolve filename agianst.                                                                                                                                                                                      |
-| `type`    | `merge`, `write`, `build` | Type of operation to perform. `merge` adds given dcp to the design placed and routed inside the given pblock. `build` constructs a module from its descendant `merge`s and `build`s. `write` saves the current state to a dcp. |
+| `type`    | `merge`, `write`, `build` | Type of operation to perform. `merge` adds given DCP to the design placed and routed inside the given pblock. `build` constructs a module from its descendant `merge`s and `build`s. `write` saves the current state to a DCP. |
 
-You can insert comments basically anywhere just as in standard xml.
+You can insert comments basically anywhere just as in standard XML.
 
 ```xml
-<!-- This is an xml comment. -->
+<!-- This is an XML comment. -->
 <!--
 This is a 
-block xml comment.
+block XML comment.
 -->
 ```
 
-The following are the tags used in [metadata](#55-metadata) files.
+The following are the tags used in [metadata][] files.
 
 | Index | Tag           | Children | Attributes  | Description                                                                                |
 | :---- | :------------ | :------- | :---------- | :----------------------------------------------------------------------------------------- |
@@ -302,11 +328,11 @@ Working on this feature
 
 The `iii_dir` is the working directory to save intermediate designs as well as temporary files (such as tcl scripts).
 
-The `ooc_dir` is the directory where your out of context dcps are located.
+The `ooc_dir` is the directory where your out of context DCPs are located.
 
 The `out_dir` is the output directory.
 
-These are defined in the xml header using their name as the [tag](#325-tags). If defined, they may then be used when specifying files in `inst`. Either,
+These are defined in the XML header using their name as the [tag][]. If defined, they may then be used when specifying files in `inst`. Either,
 
 1. Specify `loc` attribute as `iii`, `ooc` or `out`.
 
@@ -322,22 +348,18 @@ These are defined in the xml header using their name as the [tag](#325-tags). If
 
 *Note*: You can use either of these methods for any tag that has attribute `loc`.
 
-**Important**: None of these three directories must be specified in the xml header.
+**Important**: None of these three directories must be specified in the XML header.
 
-The `iii_dir` will automatically be created in your pwd as `pwd/.iii` if not specified. The others are simply shortcuts for the user when inputting in the xml file (they will be created if specified but don't exist yet). In fact, if you decided to use the `ooc_dir` for output files and the out_dir for ooc modules, ShellBuilder would have no issue with that. Nor would it complain if you specified an ooc dcp or output file relative to the `iii_dir`.
+The `iii_dir` will automatically be created in your pwd as `pwd/.iii` if not specified. The others are simply shortcuts for the user when inputting in the XML file (they will be created if specified but don't exist yet). In fact, if you decided to use the `ooc_dir` for output files and the out_dir for OOC modules, ShellBuilder would have no issue with that. Nor would it complain if you specified an OOC DCP or output file relative to the `iii_dir`.
 
-#### 3.2.7 An XML Example
+#### 3.2.7 XML Example
 
-This example is to demonstrate the syntactical use of some of the tags. It is not intended to be a working example. For a simple real example see the example xml files (
-  [generator](example/build_generator_template.xml),
-  [resulting template](example/build_wrapper_template.xml),
-  [filled in template](example/build_shell.xml)
-).
+This example is to demonstrate the syntactical use of some of the tags. It is not intended to be a working example. For a simple real example see the example XML files ([generator][ex xml generator], [resulting template][ex xml template], [filled in template][ex xml filled]).
 
 ```xml
 <!-- 
 <?xml version = "1.0"?>
-I don't know if the Java library checks for xml version.
+I don't know if the Java library checks for XML version.
 It worked whether version was either included or not.
 -->
 <root>
@@ -398,27 +420,27 @@ Many of the top level functions are directly or indirectly recursive to handle t
 
 Most Java classes in this project can be found in a file `<ClassName>.java` inside the directory `src/main/<package>`. An exception to this is `TemplateBuilder` which is actually a nested class inside the `DirectiveWriter` class.
 
-For further reference, see source code and/or [generate the JavaDocs](#7-additional-reading).
+For further reference, see source code and/or [generate the JavaDocs][Additional Reading].
 
 ### 4.1 ShellBuilder#start
 
-The top function is [ShellBuilder](src/main/top/ShellBuilder.java)`#start`. It executes the following tasks
+The top function is [ShellBuilder][]`#start`. It executes the following tasks
 
 1. Parse command line arguments into an `ArgsContainer`.
-2. Parse xml file.
-   - Stores xml data using 3 main classes which correspond to the higher level [tags](#325-tags) in the xml input.
-     1. [DirectiveBuilder](src/main/directive/DirectiveBuilder.java): Wrapper to parse and store a set of sibling `Directive`s, a `DirectiveHeader` and a set of `TemplateBuilder`s.
-     2. [Directive](src/main/directive/Directive.java): Describes an instruction regarding how to construct the design. Parallels a `inst="merge"` or `inst="build"`. If it is a `inst="build"` then it stores a `DirectiveBuilder` with all its `inst`, `template` and `header` children. If it is a `inst="merge"` then it stores a dcp and other data to merge its stored dcp into the above design. Both times, it also stores the `header` which is a sibling to this `inst`.
-     3. [DirectiveHeader](src/main/directive/DirectiveHeader.java): Stores data common to a group of sibling `Directive`s plus a link to the `header` that is a sibling to the parent of this `header`.
-   - These classes recurse to form a tree just like the tree in the xml file being parsed.
+2. Parse XML file.
+   - Stores XML data using 3 main classes which correspond to the higher level [Tags][] in the XML input.
+     1. [DirectiveBuilder][]: Wrapper to parse and store a set of sibling `Directive`s, a `DirectiveHeader` and a set of `TemplateBuilder`s.
+     2. [Directive][]: Describes an instruction regarding how to construct the design. Parallels a `inst="merge"` or `inst="build"`. If it is a `inst="build"` then it stores a `DirectiveBuilder` with all its `inst`, `template` and `header` children. If it is a `inst="merge"` then it stores a DCP and other data to merge its stored DCP into the above design. Both times, it also stores the `header` which is a sibling to this `inst`.
+     3. [DirectiveHeader][] Stores data common to a group of sibling `Directive`s plus a link to the `header` that is a sibling to the parent of this `header`.
+   - These classes recurse to form a tree just like the tree in the XML file being parsed.
    - An additional class
-     1. [DirectiveWriter](src/main/directive/DirectiveWriter.java)`.TemplateBuilder`: Stores data relating for generating templates
+     1. [DirectiveWriter][]`.TemplateBuilder`: Stores data relating for generating templates
 3. Write templates
-   - `ShellBuilder#runTemplateBuilder`: Recursively run all `TemplateBuilder`s that were found in the xml file.
-4. Write xdc files for each top level `inst`.
+   - `ShellBuilder#runTemplateBuilder`: Recursively run all `TemplateBuilder`s that were found in the XML file.
+4. Write XDC files for each top level `inst`.
    - Generates constraints files (.xdc) from the project (.xpr) for each hierarchial cell.
-5. [ShellBuilder#runBuilder](#44-shellbuilderrunbuilder)
-   - Main worker for building the final dcp
+5. [ShellBuilder#runBuilder][]
+   - Main worker for building the final DCP.
 
 ### 4.2 XDCWriter#writeAllHierXDC
 
@@ -432,13 +454,13 @@ Run the script to open the project and write all constraints files to cache.
 
 ### 4.3 TemplateBuilder & DirectiveWriter
 
-Read the input dcp. Expects design wrapper because it has empty cells at the levels where the ooc dcps are.
+Read the input DCP. Expects design wrapper because it has empty cells at the levels where the OOC DCPs are.
 
 Starting with the top cell instance of the input design, construct a tree paralleling the cells in the design using a call to constructInst.
 
-`DirectiveWriter#constructInst(EDIFCellInst ci)`: If ci has no contents, construct an object representing an `inst="merge"` (use `ooc_dir` to attempt to infer the ooc dcp). If ci has contents, construct an object representing an `inst="build"` instead.
+`DirectiveWriter#constructInst(EDIFCellInst ci)`: If ci has no contents, construct an object representing an `inst="merge"` (use `ooc_dir` to attempt to infer the OOC DCP). If ci has contents, construct an object representing an `inst="build"` instead.
 
-- This desinction between what is a leaf (ie. merge) and what is a branch (ie. build) seems to work when the input dcp is the design wrapper. It may not work as well for other dcps since they unlike the wrapper are not going to have empty cells everywhere that there is an ooc module waiting to be filled in.
+- This desinction between what is a leaf (ie. merge) and what is a branch (ie. build) seems to work when the input DCP is the design wrapper. It may not work as well for other DCPs since they unlike the wrapper are not going to have empty cells everywhere that there is an OOC module waiting to be filled in.
 - For reasons including this, the generated file is a guide only and may need to be adjusted as well as filled in.
 
 `DirectiveWriter#constructBuild(EDIFCellInst ci)`: Construct an object representing an `inst="build"`. Construct an object representing a `header` using `constructHeader` and recursively construct objects representing each subcell by calling `constructInst` on each subcell.
@@ -447,9 +469,9 @@ Starting with the top cell instance of the input design, construct a tree parall
 
 Add a few more details to the top level header.
 
-#### 4.3.1 Infering dcps
+#### 4.3.1 Infering DCPs
 
-The infering of dcps is done under the assumption that `ooc_dir` is set to `<proj_dir>/<proj_name>.runs`. Using this, the program looks for all folders in the `ooc_dir` that have a name `*<cell_type_name>*`. For each of these folders it finds the first dcp file inside. The infered dcp is the one with the shortest name (if any dcps are found). This is to try to account for the fact that one cell's name might be a substring of another cell's name.
+The infering of DCPs is done under the assumption that `ooc_dir` is set to `<proj_dir>/<proj_name>.runs`. Using this, the program looks for all folders in the `ooc_dir` that have a name `*<cell_type_name>*`. For each of these folders it finds the first DCP file inside. The infered DCP is the one with the shortest name (if any DCPs are found). This is to try to account for the fact that one cell's name might be a substring of another cell's name.
 
 ### 4.4 ShellBuilder#runBuilder
 
@@ -457,25 +479,25 @@ This method orchestrates the builder workflow following the instructions contain
 
 If the `DirectiveBuilder` contains an `initial` then the `Merger` is initialized with that. Else the `Merger` is initialized with an empty design (really it is initialized with no design and later is initialized with an empty design when it tries to add a Module to the `Merger`'s design and finds that it hasn't been initialized yet).
 
-Then it runs each `Directive` using [runDirective](#45-shellbuilderrundirective).
+Then it runs each `Directive` using [runDirective][ShellBuilder#runDirective].
 
-Then it writes the `Merger` design to a dcp and a tcl script is called to place and route the merged design using Vivado. Note that the constraints file generated earlier for this cell is read in by vivado before place and route is run. Note further that due to some errors I was experiencing, if the tcl script exits with an error, it tries to run again but without the constraints.
+Then it writes the `Merger` design to a DCP and a tcl script is called to place and route the merged design using Vivado. Note that the constraints file generated earlier for this cell is read in by vivado before place and route is run. Note further that due to some errors I was experiencing, if the tcl script exits with an error, it tries to run again but without the constraints.
 
-If the very last `inst` in this `DirectiveBuilder` is a `write` then the placed and routed dcp and edif are copied there (overwriting the unplaced dcp and edif that were written there by runDirective).
+If the very last `inst` in this `DirectiveBuilder` is a `write` then the placed and routed DCP and EDIF are copied there (overwriting the unplaced DCP and EDIF that were written there by runDirective).
 
 ### 4.5 ShellBuilder#runDirective
 
 Executes a single `Directive` based on its `type`.
 
-- `merge`: Call `Merger#merge` to merge the dcp into the `Merger`'s design.
-- `write`: Write design in `Merger` to a dcp.
-- `build`: Try to [find module in cache](#49-mergerfindmoduleincache) and check if it is valid and up to date. If not found, recurse by calling [runBuilder](#44-shellbuilderrunbuilder) to generate the module in cache. Then call `Merger#merge`.
+- `merge`: Call `Merger#merge` to merge the DCP into the `Merger`'s design.
+- `write`: Write design in `Merger` to a DCP.
+- `build`: Try to [find module in cache][Merger#findModuleInCache] and check if it is valid and up to date. If not found, recurse by calling [runBuilder][ShellBuilder#runBuilder] to generate the module in cache. Then call `Merger#merge`.
 
 ### 4.6 Design classes
 
 | Class         | Brief description                                                                                                                                 |
 | :------------ | :------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Design`      | Represents a design including both logical and physical netlists as well as placement and routing information. Can be read from/written to a dcp. |
+| `Design`      | Represents a design including both logical and physical netlists as well as placement and routing information. Can be read from/written to a DCP. |
 | `EDIFNetlist` | Represents a logical netlist.                                                                                                                     |
 | `Module`      | Wrapper for a `Design`. Serves as a prototype for `ModuleInst`s.                                                                                  |
 | `ModuleInst`  | An instance of a `Module` which can placed into a `Design` (different design from the one represented by this `ModuleInst`).                      |
@@ -483,15 +505,15 @@ Executes a single `Directive` based on its `type`.
 
 ### 4.7 Merger#merge
 
-Orchestrates reading a dcp, placing it into the current design and connecting it to the rest of the design.
+Orchestrates reading a DCP, placing it into the current design and connecting it to the rest of the design.
 
 To do this, `merge` calls
 
-- [fetchAndPrepModule](#411-mergerfetchandprepmodule)
-- [insertOOC](#412-mergerinsertooc)
-- [connectAll](#413-mergerconnectall)
+- [fetchAndPrepModule][Merger#fetchAndPrepModule]
+- [insertOOC][Merger#insertOOC]
+- [connectAll][Merger#connectAll]
 
-It may also call [Merger#init](#410-mergerinit) before `insertOOC`.
+It may also call [Merger#init][] before `insertOOC`.
 
 ### 4.8 Cache
 
@@ -502,15 +524,15 @@ The structure of the cache is
 - `iii_dir`
   - moduleCache
     - module 1
-      - [cached dcp](#51-dcp) (no pblock constraint given)
-      - [edif](#52-edif)
-      - [metadata](#55-metadata)
-      - [xdc](#53-xdc)
+      - [cached DCP][DCP] (no pblock constraint given)
+      - [EDIF][]
+      - [metadata][]
+      - [XDC][]
       - pblock 1
-        - cached dcp
-        - edif
+        - cached DCP
+        - EDIF
         - metadata
-        - xdc
+        - XDC
       - pblock 2
         - ...
       - ...
@@ -520,19 +542,19 @@ The structure of the cache is
 
 ### 4.9 Merger#findModuleInCache
 
-Find if the correct directory exists in the cache using `iii_dir`, `module_name` or `dcp` and `pblock`. If it doesn't exist, the module is not yet in the cache. Else the dcp in that directory is the candadate cached dcp.
+Find if the correct directory exists in the cache using `iii_dir`, `module_name` or `dcp` and `pblock`. If it doesn't exist, the module is not yet in the cache. Else the DCP in that directory is the candadate cached DCP.
 
-Parse the [metadata](#55-metadata) file in the same directory and create 2 copies of a set of all the `dependancy`s with their pblocks.
+Parse the [metadata][] file in the same directory and create 2 copies of a set of all the `dependancy`s with their pblocks.
 
 If `synth` or `initial` for the `Directive` does not match the stored value in the metadata, return not found.
 
-If this `Directive` is an `inst="build"`, then for each child `inst` ensure it is in the first dependancy set (if not in set, return not found), remove it from the second set and try to find it in the cache. If any `inst` could not be found in the cache or was newer than the candadate cached dcp representing this `Directive`, return not found.
+If this `Directive` is an `inst="build"`, then for each child `inst` ensure it is in the first dependancy set (if not in set, return not found), remove it from the second set and try to find it in the cache. If any `inst` could not be found in the cache or was newer than the candadate cached DCP representing this `Directive`, return not found.
 
 As an optimization, the cached modules that have been checked and verified are added to a set of visited modules. The module is not rechecked if it is part of the visited set.
 
-Else the `Directive` is an `inst="merge"`. If the `dcp` is newer than the candidate cached dcp, return not found. Remove the cached dcp from the second dependancy set.
+Else the `Directive` is an `inst="merge"`. If the `dcp` is newer than the candidate cached DCP, return not found. Remove the cached DCP from the second dependancy set.
 
-If the dependancy set is not empty, return not found because the cached dcp was created using more `ModuleInst`s than are specified under this `Directive`.
+If the dependancy set is not empty, return not found because the cached DCP was created using more `ModuleInst`s than are specified under this `Directive`.
 
 ### 4.10 Merger#init
 
@@ -544,9 +566,9 @@ This function also uses the `synth` design (if specified) to copy in top level p
 
 If the directive has the tag `only_wires` cache it to handle later.
 
-If not `refresh` (neither in `header` nor in `inst`) then try to [find the module in cache.](#49-mergerfindmoduleincache).
+If not `refresh` (neither in `header` nor in `inst`) then try to [find the module in cache][Merger#findModuleInCache].
 
-If not found then call `Merger#placeRouteOOC`. This invokes Vivado with a tcl script to open the dcp associated with this `Directive`, place and route it and write it to the cache.
+If not found then call `Merger#placeRouteOOC`. This invokes Vivado with a tcl script to open the DCP associated with this `Directive`, place and route it and write it to the cache.
 
 Initialize a module using the design that was just found/written.
 
@@ -556,17 +578,17 @@ Call `Merger#myMigrateCellsAndSubCells` to merge the logical netlist library of 
 
 This function creates an `ModuleInst` from the `Module` that was output from `Merger#fetchAndPrepModule`. It then places the `ModuleInst`.
 
-For details of how it is currently done and future improvements, see [Placing Modules](#62-placing-modules).
+For details of how it is currently done and future improvements, see [Placing Modules][].
 
 ### 4.13 Merger#connectAll
 
 This function handles connecting the modules from one level of hierarchy together.
 
-It first creates `ModuleInst`s for all the `only_wire` cells that were cached in [Merger#fetchAndPrepModule](#411-mergerfetchandprepmodule) by copying their logical nets from the `synth` in the `header`. It then creates logical port instances and nets to connect the Modules of the design (again copying from `synth`).
+It first creates `ModuleInst`s for all the `only_wire` cells that were cached in [Merger#fetchAndPrepModule][] by copying their logical nets from the `synth` in the `header`. It then creates logical port instances and nets to connect the Modules of the design (again copying from `synth`).
 
 ### 4.14 Encrypted Modules
 
-For some IPs Vivado cannot write unencrypted [edifs](#52-edif). Since RapidWright cannot read encrypted edifs, the full logical netlist of a design including encrypted modules cannot be read into RapidWright. Thus when RapidWright writes such a dcp, it is by necessity incomplete.
+For some IPs Vivado cannot write unencrypted [EDIFs][EDIF]. Since RapidWright cannot read encrypted EDIFs, the full logical netlist of a design including encrypted modules cannot be read into RapidWright. Thus when RapidWright writes such a DCP, it is by necessity incomplete.
 
 To rectify this, the following solution was implemented.
 
@@ -581,37 +603,37 @@ Note: This solution was successful for adding a multiplier to the tutorial 2 pro
 
 ### 5.1 DCP
 
-Design checkpoints are the main file for passing information between Vivado and RapidWright. See the [RapidWright](https://www.rapidwright.io) website for more.
+Design checkpoints are the main file for passing information between Vivado and RapidWright. See the [RapidWright][] website for more.
 
 ### 5.2 EDIF
 
-Edif files represent logical netlists. They may be encrypted or unencrypted.
+EDIF files represent logical netlists. They may be encrypted or unencrypted.
 
-When Vivado writes a dcp the edif file in the dcp is likely encrypted by default. Vivado can write unencrypted edifs for many IPs using tcl command `write_edif`. RapidWright cannot read encrypted edifs, however, it can read a dcp and an (unencrypted) edif together as a single `Design`.
+When Vivado writes a DCP the EDIF file in the DCP is likely encrypted by default. Vivado can write unencrypted EDIFs for many IPs using tcl command `write_edif`. RapidWright cannot read encrypted EDIFs, however, it can read a DCP and an (unencrypted) EDIF together as a single `Design`.
 
-[DesignUtils](src/main/util/DesignUtils.java)`#safeReadCheckpoint` wraps RapidWright's `Design#readCheckpoint` so that if it fails, it tries again after invoking Vivado with a tcl script to write the edif.
+[DesignUtils][]`#safeReadCheckpoint` wraps RapidWright's `Design#readCheckpoint` so that if it fails, it tries again after invoking Vivado with a tcl script to write the EDIF.
 
 However, not all IPs may be written unencrypted even by Vivado. In the case that a design has some cells that can't be unencrypted then `write_edif` writes as much of the logical netlist unencrypted as it is allowed to and writes the modules that must remain encrypted to separate encrypted files.
 
-Two file extensions are used for edif files. Those that are requested by ShellBuilder with the tcl command `write_edif` or written in a dcp have the extension `.edf`. Those encrypted edifs that are automatically generated for encrypted cells have the extension `.edn`.
+Two file extensions are used for EDIF files. Those that are requested by ShellBuilder with the tcl command `write_edif` or written in a DCP have the extension `.edf`. Those encrypted EDIFs that are automatically generated for encrypted cells have the extension `.edn`.
 
-Integrating these files back into the design since they cannot be loaded or written to by RapidWright is described in [Encrypted Modules](#414-encrypted-modules).
+Integrating these files back into the design since they cannot be loaded or written to by RapidWright is described in [Encrypted Modules][].
 
 ### 5.3 XDC
 
-Xilinx Design Constraints are important for restricting placement of some cells and ...
+Xilinx Design Constraints contain information that is used by Vivado to specify parts of the design.
 
-The xdcs included in a project are not automatically copied into the ooc dcps. To try to ensure that Vivado's placer and router have all the information needed, I use `write_xdc` for each cell that will be built.
+The XDCs included in a project are not automatically copied into the OOC DCPs. To try to ensure that Vivado's placer and router have all the information needed, I use `write_xdc` for each cell that will be built.
 
 ### 5.4 XML Build Directives
 
-For specific details on the tags and attributes used in this file, see [tags](#325-tags).
+For specific details on the tags and attributes used in this file, see [Tags][].
 
 ### 5.5 Metadata
 
 Metadata files in the cache serve the purpose of keeping track of what files were used to construct this cached file.
 
-They track the `synth` and `initial` files (or lack of) in the header of the `Directive` that built this dcp. They also track all the dcps that were merged into this dcp using the tag `dependancy`.
+They track the `synth` and `initial` files (or lack of) in the header of the `Directive` that built this DCP. They also track all the DCPs that were merged into this DCP using the tag `dependancy`.
 
 A module is considered changed and will be regenerated if
 
@@ -619,13 +641,13 @@ A module is considered changed and will be regenerated if
 - `initial` changed
 - any `dependancy`
   - cannot be found
-  - is newer than this dcp
+  - is newer than this DCP
   - is changed (recurse)
-- The set of dependancies (and their pblocks) does not match the build specified in the xml
+- The set of dependancies (and their pblocks) does not match the build specified in the XML file.
 
 A `refresh` will regenerate a module as will a `refresh` of any of its submodules (by making one of the module's dependancies out of date).
 
-For metadata tags, see [Tags](#325-tags).
+For metadata tags, see [Tags][].
 
 ## 6 Ongoing Issues / Future Work
 
@@ -644,7 +666,7 @@ Working on this feature (put these under '1' below when done). Also change Modul
    - Load from metadata file if possible.
    - If none found, call `ModuleInst#getAllValidPlacements`.
    - Cache all valid placements in metadata file.
-   - Note: the metadata file is regenerated (and thus loses valid placements) each time the dcp is regenerated.
+   - Note: the metadata file is regenerated (and thus loses valid placements) each time the DCP is regenerated.
 -->
 
 1. Find all possible placements.
@@ -671,17 +693,17 @@ However, it is currently implemented in `Merger` to try a second time without `r
 
 ### 6.4 ILAs
 
-The code for adding ILAs that was developed in [AddILA](https://github.com/brkicisi/AddILA) can be found in [ILAAdder](src/main/worker/ILAAdder.java).
+The code for adding ILAs that was developed in [AddILA][] can be found in [ILAAdder][].
 
 There is currently no integration of this with the standard ShellBuilder workflow. It is a separate module.
 
 You can currently call it explicitly from command line or hard code it in.
 
-Future work: add a way to insert ilas using same xml directives as ShellBuilder.
+Future work: add a way to insert ilas using same XML directives as ShellBuilder.
 
 ### 6.5 Vivado Version
 
-Currently the Vivado version can be changed from the default version on your machine by hardcoding it in [TCLScript](src/main/tcl/TCLScript.java)#run. Simply change the line
+Currently the Vivado version can be changed from the default version on your machine by hardcoding it in [TCLScript][]#run. Simply change the line
 
 `bash_lines.add("source /cad1/Xilinx/Vivado/2018.1/settings64.sh");`
 
@@ -689,19 +711,48 @@ so that it sources the appropriate Vivado version. Alternatively set `USE_DEFAUL
 
 ## 7 Additional Reading
 
-For more general information about RapidWright see the [RapidWright](https://www.rapidwright.io) website.
+For more general information about RapidWright see the [RapidWright][] website.
 
-[JavaDocs](https://www.rapidwright.io/javadoc/index.html) for RapidWright.
+[RapidWright JavaDocs][].
 
-Link to [ShellBuilder](https://github.com/brkicisi/ShellBuilder) on GitHub.
+Link to [ShellBuilder GitHub][].
 
-Link to [AddILA](https://github.com/brkicisi/AddILA) on GitHub.
+Link to [AddILA GitHub][AddILA].
 
 To generate offline JavaDocs for ShellBuilder
 
 `javadoc -sourcepath <path to ShellBuilder>/ShellBuilder/src -subpackages main -noqualifier java.lang:java.util:java.io -d docs -verbose -windowtitle ShellBuilder > docs.log`
 
 I haven't figured out how to properly link the docs generated by the above command so that it links to other libraries and not just within itself.
+
+<!-- HTTP Links -->
+[ShellBuilder GitHub]: https://github.com/brkicisi/ShellBuilder
+[AddILA]: https://github.com/brkicisi/AddILA
+
+[RapidWright]: https://www.rapidwright.io
+[RapidWright JavaDocs]: https://www.rapidwright.io/javadoc/index.html
+[RapidWright GitHub Releases]: https://github.com/Xilinx/RapidWright/releases
+
+[VSCode]: https://code.visualstudio.com/
+[org.w3c.dom]: https://docs.oracle.com/javase/8/docs/api/index.html?org/w3c/dom/package-summary.html
+[javax.xml.parsers]: https://docs.oracle.com/javase/8/docs/api/index.html?javax/xml/parsers/package-summary.html
+
+<!-- Internal Links -->
+[ShellBuilder]: src/main/top/ShellBuilder.java
+[README.md]: README.md
+
+[DirectiveBuilder]: src/main/directive/DirectiveBuilder.java
+[Directive]: src/main/directive/Directive.java
+[DirectiveHeader]: src/main/directive/DirectiveHeader.java
+[DirectiveWriter]: src/main/directive/DirectiveWriter.java
+
+[ILAAdder]: src/main/worker/ILAAdder.java
+[TCLScript]: src/main/tcl/TCLScript.java
+[DesignUtils]: src/main/util/DesignUtils.java
+
+[ex xml generator]: example/build_generator_template.xml
+[ex xml template]: example/build_wrapper_template.xml
+[ex xml filled]: example/build_shell.xml
 
 ## 8 Bugs and fixes
 
