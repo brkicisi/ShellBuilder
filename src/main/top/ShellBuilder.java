@@ -154,7 +154,7 @@ public class ShellBuilder {
 		
 		// ! only run if top level module?
 		// TODO is it still placing and routing both here and when the design is loaded as an ooc dcp
-		merger.placeAndRoute(out_dcp, head, args);
+		merger.placeAndRoute(out_dcp, directive_builder, args);
 
 		// Get dcp of last directive if it was a write
 		File write_dcp = null;

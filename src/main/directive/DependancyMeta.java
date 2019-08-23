@@ -37,6 +37,7 @@ public class DependancyMeta {
 	boolean verbose = false;
 	File synth_1 = null;
 	File initial_file = null;
+	ArrayDeque<String> sites = null;
 
 	/**
 	 * Default name for metadata files.
@@ -45,6 +46,7 @@ public class DependancyMeta {
 
 	public DependancyMeta(boolean verbose) {
 		dependancies = new ArrayDeque<>();
+		sites = new ArrayDeque<>();
 		this.verbose = verbose;
 	}
 
@@ -157,6 +159,13 @@ public class DependancyMeta {
 				}
 			}
 		}
+
+		Queue<Element> valid_sites_children = XMLParser.getChildElementsFromTagName(element, valid_sites.key);
+		for (Element elem : valid_sites_children) {
+			Queue<Element> sites_children = XMLParser.getChildElementsFromTagName(elem, site.key);
+			for (Element e : sites_children)
+				sites.offer(e.getTextContent());
+		}
 	}
 
 	/**
@@ -179,26 +188,56 @@ public class DependancyMeta {
 	}
 
 	/**
-	 * Write metadata to a file.
+	 * Write metadata stored in this object to a file.
 	 * 
 	 * @param output_dir Directory to which metadata will be written.
-	 * @param directive  Directive to write metadata for.
-	 * @param args       Arguments from command line.
+	 * @param args       Arguments from command line. If null, verbose is false.
 	 */
-	public static void writeMeta(File output_dir, Directive directive, ArgsContainer args) {
-		writeMeta(output_dir, META_FILENAME, directive, args);
+	public void writeMeta(File output_dir, ArgsContainer args) {
+		boolean verbose = (args != null) && args.verbose();
+
+		if (output_dir == null)
+			MessageGenerator.briefErrorAndExit("Can't write metadata inside a null directory.\nExiting.");
+		else if (!output_dir.exists())
+			FileTools.makeDirs(output_dir.getAbsolutePath());
+
+		File iii_dir = fsys.getRoot(FileSys.FILE_ROOT.III);
+		File ooc_dir = fsys.getRoot(FileSys.FILE_ROOT.OOC);
+
+		String meta_filename = output_dir.getAbsolutePath() + "/" + META_FILENAME;
+		List<String> lines = toMetaLines(dependancies, iii_dir, ooc_dir, synth_1, initial_file, sites, meta_filename,
+				verbose);
+		FileTools.writeLinesToTextFile(lines, meta_filename);
 	}
 
 	/**
 	 * Write metadata to a file.
 	 * 
-	 * @param output_dir Directory to which metadata will be written.
-	 * @param filename   Filename to give metadata file in output_dir.
-	 * @param directive  Directive to write metadata for.
-	 * @param args       Arguments from command line.
+	 * @param output_dir  Directory to which metadata will be written.
+	 * @param directive   Directive to write metadata for.
+	 * @param sites Names of {@link com.xilinx.rapidwright.device.Site} which
+	 *                    are valid placements for this directive.
+	 * @param args        Arguments from command line. If null, verbose is false.
 	 */
-	public static void writeMeta(File output_dir, String filename, Directive directive, ArgsContainer args) {
-		boolean verbose = (args == null) ? false : args.verbose();
+	public static void writeMeta(File output_dir, Directive directive, ArrayDeque<String> sites,
+			ArgsContainer args) {
+		writeMeta(output_dir, META_FILENAME, directive, sites, args);
+	}
+
+	/**
+	 * Write metadata to a file.
+	 * 
+	 * @param output_dir  Directory to which metadata will be written.
+	 * @param filename    Filename to give metadata file in output_dir.
+	 * @param directive   Directive to write metadata for.
+	 * @param sites Names of {@link com.xilinx.rapidwright.device.Site} which
+	 *                    are valid placements for this directive.
+	 * @param args        Arguments from command line. If null, verbose is false.
+	 */
+	public static void writeMeta(File output_dir, String filename, Directive directive, ArrayDeque<String> sites,
+			ArgsContainer args) {
+		boolean verbose = (args != null) && args.verbose();
+
 		if (output_dir == null)
 			MessageGenerator.briefErrorAndExit("Can't write metadata inside a null directory.\nExiting.");
 		else if (!output_dir.exists())
@@ -212,14 +251,15 @@ public class DependancyMeta {
 			for (Directive dir : directive.getSubBuilder().getDirectives())
 				if (!dir.isOnlyWires())
 
-				dependancies.add(Merger.findModuleInCache(dir, args, true));
+					dependancies.add(Merger.findModuleInCache(dir, args, true));
 		} else
 			dependancies.add(directive.getDCP());
 
 		String meta_filename = output_dir.getAbsolutePath() + "/" + filename;
 		File synth_1 = directive.getHeader().getTopLevelSynth();
 		File initial = directive.getHeader().getInitial();
-		List<String> lines = toMetaLines(dependancies, iii_dir, ooc_dir, synth_1, initial, meta_filename, verbose);
+		List<String> lines = toMetaLines(dependancies, iii_dir, ooc_dir, synth_1, initial, sites, meta_filename,
+				verbose);
 		FileTools.writeLinesToTextFile(lines, meta_filename);
 	}
 
@@ -237,13 +277,15 @@ public class DependancyMeta {
 	 *                        exists (not null). Included in header.
 	 * @param initial         Directives are dependant on initial design if it
 	 *                        exists (not null). Included in header.
+	 * @param sites     Collection of site strings to be written to the
+	 *                        metadata file.
 	 * @param output_filename File that these lines will be written to. Only used in
 	 *                        display of error messages.
 	 * @param verbose         Print extra messages.
 	 * @return A list of lines (strings) of xml code.
 	 */
 	public static List<String> toMetaLines(Collection<File> dependancies, File iii_dir, File ooc_dir, File synth_1,
-			File initial, String output_filename, boolean verbose) {
+			File initial, Collection<String> sites, String output_filename, boolean verbose) {
 		List<String> lines = new ArrayList<>();
 		lines.add("<root>");
 
@@ -262,15 +304,31 @@ public class DependancyMeta {
 		}
 
 		// Construct a dependancy instance for each file in dependancies.
-		for (File dep : dependancies) {
-			if (dep == null) {
-				printIfVerbose("Ignoring attempt to add null file to cache file '"
-						+ (output_filename == null ? null : output_filename) + "'.", verbose);
-				continue;
-			} else if (!dep.isFile())
-				printIfVerbose("Adding dependancy which does not exist yet '" + dep.getAbsolutePath() + "'.", verbose);
+		if (dependancies != null) {
+			for (File dep : dependancies) {
+				if (dep == null) {
+					printIfVerbose("Ignoring attempt to add null file to dependancies in metadata file '"
+							+ (output_filename == null ? null : output_filename) + "'.", verbose);
+					continue;
+				} else if (!dep.isFile())
+					printIfVerbose("Adding dependancy which does not exist yet '" + dep.getAbsolutePath() + "'.",
+							verbose);
 
-			lines.add("\t" + makeReducedFileLine(dependancy, dep, iii_dir, ooc_dir));
+				lines.add("\t" + makeReducedFileLine(dependancy, dep, iii_dir, ooc_dir));
+			}
+		}
+		if (sites != null) {
+			lines.add("\t<" + valid_sites.key + ">");
+			for (String s : sites) {
+				if (site == null) {
+					printIfVerbose("Ignoring attempt to add null site to valid sites in metadata file '"
+							+ (output_filename == null ? null : output_filename) + "'.", verbose);
+					continue;
+				}
+
+				lines.add("\t\t<" + site.key + ">" + s + "</" + site.key + ">");
+			}
+			lines.add("\t</" + valid_sites.key + ">");
 		}
 		lines.add("</root>");
 		return lines;
@@ -309,6 +367,22 @@ public class DependancyMeta {
 	 */
 	public Collection<File> getDependancies() {
 		return Collections.unmodifiableCollection(dependancies);
+	}
+
+	/**
+	 * @return Unmodifiable collection of valid site strings.
+	 */
+	public Collection<String> getValidSiteStrs() {
+		return Collections.unmodifiableCollection(sites);
+	}
+
+	/**
+	 * Replace any existing contents of sites with new list of site strings.
+	 * 
+	 * @param valid_placements New set of placements to be stored.
+	 */
+	public void setValidSites(ArrayDeque<String> valid_placements) {
+		sites = valid_placements;
 	}
 
 	/**
@@ -351,6 +425,8 @@ public class DependancyMeta {
 
 	public static final HEADER header = new HEADER();
 	public static final FILE dependancy = new FILE("dependancy");
+	public static final TAG valid_sites = new TAG("valid_sites");
+	public static final TAG site = new TAG("site");
 
 	/**
 	 * Multimap of modules and pblocks for use by

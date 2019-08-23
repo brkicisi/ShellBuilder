@@ -2,6 +2,10 @@ package main.worker;
 
 import java.awt.Point;
 import java.io.File;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -26,6 +30,7 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
 import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -40,6 +45,7 @@ import main.parser.ArgsContainer;
 import main.tcl.TCLEnum;
 import main.tcl.TCLScript;
 import main.directive.Directive;
+import main.directive.DirectiveBuilder;
 import main.directive.DirectiveHeader;
 import main.directive.DependancyMeta;
 import main.util.DesignUtils;
@@ -66,7 +72,7 @@ public class Merger {
 	private Design design = null;
 	private Device device = null;
 	private EDIFNetlist synth_netlist = null;
-	private Map<String, EDIFCell> wire_cells = new HashMap<>();
+	private Map<String, EDIFCellInst> wire_cells = new HashMap<>();
 	private File final_dcp = null;
 
 	/**
@@ -177,13 +183,14 @@ public class Merger {
 			EDIFCell top = null;
 			if (directive.getDCP() == null) {
 				top = design.getNetlist().getTopCell();
+				EDIFCell synth_top = synth_netlist.getCell(top.getName());
+				wire_cells.put(directive.getInstName(), synth_top.getCellInst(top.getName()));
 			} else {
 				Design d = DesignUtils.safeReadCheckpoint(directive.getDCP(), directive.getHeader().isVerbose(),
 						directive.getIII());
-				top = d.getNetlist().getTopCell();
+				EDIFCellInst ci = d.getNetlist().getTopCellInst();
+				wire_cells.put(directive.getInstName(), ci);
 			}
-			EDIFCell synth_top = synth_netlist.getCell(top.getName());
-			wire_cells.put(directive.getInstName(), synth_top);
 			return null;
 		} else if (directive.getDCP() == null) {
 			MessageGenerator.briefErrorAndExit("\nNo dcp in merge directive.\nExiting.");
@@ -462,7 +469,7 @@ public class Merger {
 			cache_impl_dir.mkdirs();
 
 		// write metadata for cache
-		DependancyMeta.writeMeta(cache_impl_dir, directive, args);
+		DependancyMeta.writeMeta(cache_impl_dir, directive, null, args);
 
 		String options = (args == null) ? "f" : args.options("f");
 		String input_dcp = directive.getDCP().getAbsolutePath();
@@ -476,6 +483,11 @@ public class Merger {
 					src_constrs.getAbsolutePath());
 		else
 			script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged", src_constrs.getAbsolutePath());
+
+		if (directive.isSubBuilder())
+			insertEncryptedModules(input_dcp, script, directive.getSubBuilder().getDirectives(), args);
+		else
+			insertEncryptedModules(input_dcp, script, Arrays.asList(directive), args);
 
 		Design d = DesignUtils.safeReadCheckpoint(input_dcp, directive.getHeader().isVerbose(), directive.getIII());
 		EDIFCell top = d.getNetlist().getTopCell();
@@ -502,6 +514,11 @@ public class Merger {
 		int ret = script.run(false);
 		if (ret != 0) {
 			TCLScript script2 = new TCLScript(input_dcp, output_dcp, options, tcl_script_file);
+			if (directive.isSubBuilder())
+				insertEncryptedModules(input_dcp, script, directive.getSubBuilder().getDirectives(), args);
+			else
+				insertEncryptedModules(input_dcp, script, Arrays.asList(directive), args);
+
 			if (!top.getCellInsts().isEmpty()) {
 				if (directive.getPBlockStr() != null) {
 					String pblock_name = "[get_property TOP [current_design ]]" + "_pblock";
@@ -593,15 +610,6 @@ public class Merger {
 		ModuleInst mi = null;
 		// PBlock block = new PBlock(device, directive.getPBlockStr());
 
-		// if (directive.getInstName().equals("clk_wiz_1")) { // TODO remove this 'if'
-		// String mi_name = directive.getInstName();
-		// // TODO set mi name if duplicate
-		// if (mi_name == null)
-		// mi_name = mod.getName() + "_i";
-		// mi = design.createModuleInst(mi_name, mod);
-		// mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
-		// return mi;
-		// }
 		// TODO better auto placer
 
 		Site anchor_site = null;
@@ -645,9 +653,16 @@ public class Merger {
 		mi = design.createModuleInst(mi_name, mod);
 		mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
 
-		printIfVerbose("Finding all valid placements for module '" + mod.getName() + "'",
-				directive.getHeader().isVerbose());
-		List<Site> valid_placements = mi.getAllValidPlacements();
+		List<Site> valid_placements = new ArrayList<Site>();
+		// TODO verify that storing and loading placements succeeds properly
+		// loadValidSitesFromMeta(valid_placements, directive);
+		if (valid_placements.size() <= 0) {
+			printIfVerbose("No valid placements found in metadata. Finding all valid placements for module '" + mod.getName() + "'",
+					directive.getHeader().isVerbose());
+			valid_placements = mi.getAllValidPlacements();
+			// writeValidSitesToMeta(valid_placements, directive);
+		}
+
 		int left_pblock_row = 0, bot_pblock_col = 0;
 		// if (directive.getPBlockStr() != null) {
 		// PBlock block = new PBlock(device, directive.getPBlockStr());
@@ -695,7 +710,7 @@ public class Merger {
 			}
 		}
 
-		if (anchor_site != null) { // TODO printIfVerbose
+		if (anchor_site != null) {
 			printIfVerbose("Placing module instance '" + mi.getName() + "' at '" + anchor_site.getName() + "'.",
 					directive.getHeader().isVerbose());
 			mi.place(anchor_site);
@@ -732,6 +747,42 @@ public class Merger {
 		return mi;
 	}
 
+	@SuppressWarnings("unused")
+	private void loadValidSitesFromMeta(List<Site> valid_placements, Directive directive) {
+		File impl_dir = XDCWriter.findOrMakeCacheDir(directive, null);
+		File metadata = new File(impl_dir, DependancyMeta.META_FILENAME);
+
+		if (!metadata.isFile()) {
+			printIfVerbose(
+					"Can't load valid sites from metadata file '" + metadata.getAbsolutePath() + "'. It doesn't exist.",
+					directive.getHeader().isVerbose());
+			return;
+		}
+		printIfVerbose("Loading valid sites from metadata.", directive.getHeader().isVerbose());
+
+		DependancyMeta meta = new DependancyMeta(metadata, directive.getHeader().isVerbose());
+		for (String site_str : meta.getValidSiteStrs()) {
+			Site s = device.getSite(site_str);
+			if (s != null)
+				valid_placements.add(s);
+		}
+	}
+
+	@SuppressWarnings("unused")
+	private void writeValidSitesToMeta(List<Site> valid_placements, Directive directive) {
+		File impl_dir = XDCWriter.findOrMakeCacheDir(directive, null);
+		File metadata = new File(impl_dir, DependancyMeta.META_FILENAME);
+
+		printIfVerbose("Writing valid sites to metadata.", directive.getHeader().isVerbose());
+
+		DependancyMeta meta = new DependancyMeta(metadata, directive.getHeader().isVerbose());
+		ArrayDeque<String> site_strs = new ArrayDeque<>();
+		for (Site s : valid_placements)
+			site_strs.offer(s.getName());
+		meta.setValidSites(site_strs);
+		meta.writeMeta(impl_dir, null);
+	}
+
 	/**
 	 * Get named EDIFNet if it exists in parent_cell else create the net in
 	 * parent_cell.
@@ -763,10 +814,10 @@ public class Merger {
 		EDIFCell top = design.getNetlist().getTopCell();
 		EDIFCell synth_top = synth_netlist.getCell(top.getName());
 
-		for (Entry<String, EDIFCell> e : wire_cells.entrySet()) {
+		for (Entry<String, EDIFCellInst> e : wire_cells.entrySet()) {
 			String ci_name = e.getKey();
-			// EDIFCell sub_synth_top = e.getValue();
-			EDIFCellInst synth_ci = synth_top.getCellInst(ci_name);
+			EDIFCellInst synth_ci = e.getValue();
+
 			if (synth_ci == null) {
 				printIfVerbose("Couldn't find wire cell instance '" + ci_name + "'.", args.verbose());
 				continue;
@@ -778,7 +829,7 @@ public class Merger {
 			EDIFDesign edifdsgn = new EDIFDesign(cell_name);
 			edifdsgn.setTopCell(cell);
 			edifnetlist.setDesign(edifdsgn);
-			Design d = new Design(synth_ci.getName(), design.getPartName());
+			Design d = new Design(ci_name, design.getPartName());
 			d.setNetlist(edifnetlist);
 
 			// EDIFCell sub_top = d.getNetlist().getTopCell();
@@ -797,7 +848,7 @@ public class Merger {
 			// synth_port.getWidth());
 
 			Module mod = new Module(d);
-			ModuleInst mi = design.createModuleInst(synth_ci.getName(), mod);
+			ModuleInst mi = design.createModuleInst(ci_name, mod);
 			mi.getCellInst().setCellType(mod.getNetlist().getTopCell());
 			wire_cells.remove(ci_name);
 		}
@@ -825,6 +876,10 @@ public class Merger {
 	/**
 	 * Places and routes a dcp and writes the routed design back to the same file
 	 * location using vivado tcl.
+	 * <p>
+	 * Calls
+	 * {@link #insertEncryptedModules(TCLScript, DirectiveBuilder, ArgsContainer)
+	 * insertEncryptedModules}.
 	 * 
 	 * @param inout_file File where input dcp is located and where final design will
 	 *                   be written.
@@ -832,12 +887,15 @@ public class Merger {
 	 *                   build this design.
 	 * @param args       Arguments from the command line.
 	 */
-	public void placeAndRoute(File inout_file, DirectiveHeader head, ArgsContainer args) {
+	public void placeAndRoute(File inout_file, DirectiveBuilder directive_builder, ArgsContainer args) {
+		DirectiveHeader head = directive_builder.getHeader();
+
 		String options = (args == null) ? "f" : args.options("f");
 		String inout_dcp = inout_file.getAbsolutePath();
 		String tcl_script_file = head.getIII().getAbsolutePath() + "/place_route_step.tcl";
 
 		TCLScript script = new TCLScript(inout_dcp, inout_dcp, options, tcl_script_file);
+		insertEncryptedModules(inout_dcp, script, directive_builder.getDirectives(), args);
 
 		File cache_impl_dir = inout_file.getParentFile();
 		File src_constrs = new File(cache_impl_dir, XDCWriter.CONSTRAINTS_FILE);
@@ -858,6 +916,7 @@ public class Merger {
 		int ret = script.run(false);
 		if (ret != 0) {
 			TCLScript script2 = new TCLScript(inout_dcp, inout_dcp, options, tcl_script_file);
+			insertEncryptedModules(inout_dcp, script, directive_builder.getDirectives(), args);
 			script2.add(TCLEnum.PLACE);
 			script2.add(TCLEnum.ROUTE);
 			script2.add(TCLEnum.WRITE_DCP);
@@ -933,6 +992,88 @@ public class Merger {
 	 */
 	public static String getPblockPath(String pblock) {
 		return pblock == null ? "" : pblock.replaceAll("_", "").replaceAll(":", "_").replaceAll(" ", "__");
+	}
+
+	/**
+	 * Merge encrypted modules back into the design.
+	 * <p>
+	 * Looks for encrypted modules in every cached submodule by checking for files
+	 * of name '.edn'. Only checks direct descendants, because the encrypted edifs
+	 * will be rewritten for each 'write_edif'. If found, it tries to load these
+	 * encrypted files back into the vivado.
+	 * 
+	 * @param inout_dcp  File to load encrypted modules into.
+	 * @param directives Load encrypted edifs from these modules
+	 */
+	public static void insertEncryptedModules(File inout_dcp, Collection<Directive> directives, ArgsContainer args) {
+		if (directives.size() <= 0)
+			return;
+		DirectiveHeader head = directives.iterator().next().getHeader();
+
+		String tcl_script_name = new File(head.getIII(), "load_encrypted_edifs.tcl").getAbsolutePath();
+		String inout_filename = inout_dcp.getAbsolutePath();
+		String options = (args == null) ? "f" : args.options("f");
+		TCLScript script = new TCLScript(inout_filename, inout_filename, options, tcl_script_name);
+
+		insertEncryptedModules(inout_dcp.getAbsolutePath(), script, directives, args);
+		script.add(TCLEnum.WRITE_DCP);
+		script.add(TCLEnum.WRITE_EDIF);
+		script.run();
+	}
+
+	/**
+	 * Adds the commands to Merge encrypted modules back into the design into the
+	 * given script.
+	 * <p>
+	 * Looks for encrypted modules in every cached submodule by checking for files
+	 * of name '.edn'. Only checks direct descendants, because the encrypted edifs
+	 * will be rewritten for each 'write_edif'. If found, it tries to load these
+	 * encrypted files back into the vivado.
+	 * 
+	 * @param script     Tcl script to add commands to.
+	 * @param directives Load encrypted edifs from these modules
+	 * @param args       Arguments from command line.
+	 */
+	public static void insertEncryptedModules(String input_dcp, TCLScript script, Collection<Directive> directives,
+			ArgsContainer args) {
+		if (directives.size() <= 0)
+			return;
+		DirectiveHeader head = directives.iterator().next().getHeader();
+
+		Design d = DesignUtils.safeReadCheckpoint(input_dcp, head.isVerbose(), head.getIII());
+		// for each cell with no contents (black box when opened in Vivado), try to find
+		// an encrypted edif with the same cell name.
+		for (Directive dir : directives) {
+			for (EDIFHierCellInst hci : d.getNetlist().findCellInsts(dir.getInstName() + "*")) {
+				EDIFCell cell = hci.getInst().getCellType();
+				if (cell.hasContents() || cell.isPrimitive())
+					continue;
+
+				File cache_impl_dir = XDCWriter.findOrMakeCacheDir(dir, null);
+				File edn_file = new File(cache_impl_dir, cell.getName() + ".edn");
+				// File[] possible_edns =
+				// cache_impl_dir.listFiles(FileTools.getFilenameFilter(cell.getName() +
+				// ".edn"));
+				if (!edn_file.isFile()) {
+					printIfVerbose(
+							"Cell '" + hci.getFullHierarchicalInstName() + "' has no contents since encrypted edif '"
+									+ edn_file.getAbsolutePath() + "' was not found.",
+							head.isVerbose());
+					continue;
+				}
+				script.addCustomCmd("update_design -cells [get_cells *" + hci.getFullHierarchicalInstName()
+						+ "] -from_file " + edn_file.getAbsolutePath());
+				// File src_constrs = new File(cache_impl_dir, XDCWriter.CONSTRAINTS_FILE);
+				// if (!(dir.isSubBuilder() &&
+				// dir.getSubBuilder().getHeader().isBufferedInputs()))
+				// script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged -mode
+				// out_of_context",
+				// src_constrs.getAbsolutePath());
+				// else
+				// script.add(TCLEnum.READ_XDC, args.options(), "-unmanaged",
+				// src_constrs.getAbsolutePath());
+			}
+		}
 	}
 
 	/**

@@ -133,15 +133,17 @@ public class XDCWriter {
 
 	/**
 	 * Find corresponding directory in the cache, create if it doesn't exist.
-	 * 
+	 *  
 	 * @param directive Find cache directory corresponding to this module.
-	 * @param args      Arguments from command line.
+	 * @param args      Arguments from command line. If null, verbose is false.
 	 * @return Directory in cache.
 	 */
 	public static File findOrMakeCacheDir(Directive directive, ArgsContainer args) {
+		boolean verbose = (args != null) && args.verbose();
+
 		File cache_dir = new File(directive.getIII(), Merger.MODULE_CACHE);
 		if (!cache_dir.isDirectory()) {
-			printIfVerbose("\nCreating cache directory at '" + cache_dir.getAbsolutePath() + "'.", args.verbose());
+			printIfVerbose("\nCreating cache directory at '" + cache_dir.getAbsolutePath() + "'.", verbose);
 			cache_dir.mkdirs();
 		}
 
@@ -151,21 +153,21 @@ public class XDCWriter {
 
 		File mod_dir = new File(cache_dir, module_name);
 		if (!mod_dir.isDirectory()) {
-			printIfVerbose("\nAdding directory for module '" + module_name + "' to cache.", args.verbose());
-			mod_dir.mkdir();
+			printIfVerbose("\nAdding directory for module '" + module_name + "' to cache.", verbose);
+			mod_dir.mkdirs();
 		}
 		String pblock = directive.getPBlockStr();
 		File impl_dir;
 		if (pblock != null) {
 			impl_dir = new File(mod_dir, Merger.getPblockPath(pblock));
 		} else {
-			printIfVerbose("\nNo pblock specified for module '" + module_name + "'.", args.verbose());
+			printIfVerbose("\nNo pblock specified for module '" + module_name + "'.", verbose);
 			impl_dir = mod_dir;
 		}
 
 		if (!impl_dir.isDirectory()) {
-			printIfVerbose("\nAdding directory for pblock '" + pblock + "' in cache.", args.verbose());
-			impl_dir.mkdir();
+			printIfVerbose("\nAdding directory for pblock '" + pblock + "' in cache.", verbose);
+			impl_dir.mkdirs();
 		}
 		return impl_dir;
 	}
@@ -174,13 +176,15 @@ public class XDCWriter {
 	 * Find corresponding directory in the cache, create if it doesn't exist.
 	 * 
 	 * @param head Find cache directory corresponding to this module.
-	 * @param args Arguments from command line.
+	 * @param args Arguments from command line. If null, verbose is false.
 	 * @return Directory in cache.
 	 */
 	public static File findOrMakeCacheDir(DirectiveHeader head, ArgsContainer args) {
+		boolean verbose = (args != null) && args.verbose();
+
 		File cache_dir = new File(head.getIII(), Merger.MODULE_CACHE);
 		if (!cache_dir.isDirectory()) {
-			printIfVerbose("\nCreating cache directory at '" + cache_dir.getAbsolutePath() + "'.", args.verbose());
+			printIfVerbose("\nCreating cache directory at '" + cache_dir.getAbsolutePath() + "'.", verbose);
 			cache_dir.mkdirs();
 		}
 		String module_name = head.getModuleName();
@@ -189,7 +193,7 @@ public class XDCWriter {
 
 		File mod_dir = new File(cache_dir, module_name);
 		if (!mod_dir.isDirectory()) {
-			printIfVerbose("\nAdding directory for module '" + module_name + "' to cache.", args.verbose());
+			printIfVerbose("\nAdding directory for module '" + module_name + "' to cache.", verbose);
 			mod_dir.mkdir();
 		}
 		return mod_dir;
