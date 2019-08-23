@@ -281,6 +281,19 @@ block xml comment.
 -->
 ```
 
+The following are the tags used in [metadata](#55-metadata) files.
+
+| Index | Tag           | Children | Attributes  | Description                                                                                |
+| :---- | :------------ | :------- | :---------- | :----------------------------------------------------------------------------------------- |
+| 4     | `header`      | 4.?      |             | Parent to data which is common to the whole metadata.                                      |
+| 4.1   | `iii_dir`     |          |             | See Tag 1.1                                                                                |
+| 4.2   | `ooc_dir`     |          |             | See Tag 1.2                                                                                |
+| 4.3   | `initial`     |          | `loc` (opt) | Represents an `initial` file which the design is dependant on. See Tag 1.4                 |
+| 4.4   | `synth`       |          | `loc` (opt) | Represents a `synth` file which the design is dependant on. See Tag 1.5                    |
+| 5     | `dependancy`  |          | `loc` (opt) | Represents one file which the design is dependant on.                                      |
+| 6     | `valid_sites` | 6.?      |             | Parent to a list of `com.xilinx.rapidwright.device.Site` names.                            |
+| 6.1   | `site`        |          |             | Name of a `com.xilinx.rapidwright.device.Site`  which is a valid placement for the design. |
+
 #### 3.2.6 iii_dir, ooc_dir & out_dir
 
 The `iii_dir` is the working directory to save intermediate designs as well as temporary files (such as tcl scripts).
@@ -608,6 +621,8 @@ A module is considered changed and will be regenerated if
 
 A `refresh` will regenerate a module as will a `refresh` of any of its submodules (by making one of the module's dependancies out of date).
 
+For metadata tags, see [Tags](#325-tags).
+
 ## 6 Ongoing Issues / Future Work
 
 ### 6.1 PBlock selection
@@ -616,12 +631,15 @@ In the future, pblock selection should be automated (as should the rest of filli
 
 ### 6.2 Placing Modules
 
-Currently `ModuleInst` placement is done with a brute force approach. This is very slow.
+Currently `ModuleInst` placement is done with a brute force approach. This can be very slow each time a new `Module` is added to a design.
 
 Placement of `ModuleInst`s is done in `Merger#insertOOC`. The current approach is
 
 1. Find all possible placements.
-   - `mi.getAllValidPlacements`
+   - Load from metadata file if possible.
+   - If none found, call `mi.getAllValidPlacements`.
+   - Cache all valid placements in metadata file.
+   - Note: the metadata file is regenerated (and thus loses valid placements) each time the dcp is regenerated.
 2. Get target site.
    - Find bottom left of pblock if specified; else bottom left of child modules recursively; else (0, 0).
 3. Find valid placement closest to target site. Closest is computed using Manhattan distance.
